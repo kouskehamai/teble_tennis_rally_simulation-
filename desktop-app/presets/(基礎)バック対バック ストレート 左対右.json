@@ -1,0 +1,141 @@
+{
+  "name": "(基礎)バック対バック ストレート 左対右",
+  "values": {
+    "length": 70,
+    "serveLeftHanded": true,
+    "receiveLeftHanded": false,
+    "totalShots": 10,
+    "shots": {
+      "1": {
+        "posX": -40,
+        "depth": -10,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 2.5,
+        "backhand": true
+      },
+      "2": {
+        "posX": -40,
+        "depth": 0,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": false
+      },
+      "3": {
+        "posX": -40,
+        "depth": -10,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": true
+      },
+      "4": {
+        "posX": -40,
+        "depth": 0,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": false
+      },
+      "5": {
+        "posX": -40,
+        "depth": -10,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": true
+      },
+      "6": {
+        "posX": -40,
+        "depth": 0,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": false
+      },
+      "7": {
+        "posX": -40,
+        "depth": -10,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": true
+      },
+      "8": {
+        "posX": -40,
+        "depth": 0,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": false
+      },
+      "9": {
+        "posX": -40,
+        "depth": -10,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": true
+      },
+      "10": {
+        "posX": -40,
+        "depth": 0,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1.5,
+        "backhand": false
+      }
+    }
+  }
+}

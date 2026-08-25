@@ -1,0 +1,37 @@
+{
+  "name": "(サーブ)巻き込み左上回転ロング",
+  "values": {
+    "length": -10,
+    "serveLeftHanded": false,
+    "receiveLeftHanded": false,
+    "totalShots": 2,
+    "shots": {
+      "1": {
+        "posX": 50,
+        "depth": 2,
+        "height": 25,
+        "delayMs": 100,
+        "angle": 8,
+        "tiltX": 100,
+        "rollAngle": 30,
+        "swingDir": 10,
+        "swingY": -30,
+        "swingSpeed": 8,
+        "backhand": false
+      },
+      "2": {
+        "posX": -16,
+        "depth": -8,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 90,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": false
+      }
+    }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "name": "(パターン右)バックサーブからのフォアカットまたはロビング②",
+  "values": {
+    "length": 75,
+    "serveLeftHanded": false,
+    "receiveLeftHanded": false,
+    "totalShots": 4,
+    "shots": {
+      "1": {
+        "posX": 12,
+        "depth": -10,
+        "height": 22,
+        "delayMs": 100,
+        "angle": -6,
+        "tiltX": 85,
+        "rollAngle": 0,
+        "swingDir": -10,
+        "swingY": -10,
+        "swingSpeed": 2,
+        "backhand": true
+      },
+      "2": {
+        "posX": 82,
+        "depth": 36,
+        "height": 10,
+        "delayMs": 100,
+        "angle": -8,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 20,
+        "swingY": 5,
+        "swingSpeed": 1,
+        "backhand": true
+      },
+      "3": {
+        "posX": -44,
+        "depth": -40,
+        "height": 4,
+        "delayMs": 250,
+        "angle": 12,
+        "tiltX": 70,
+        "rollAngle": -30,
+        "swingDir": 5,
+        "swingY": 15,
+        "swingSpeed": 1,
+        "backhand": false
+      },
+      "4": {
+        "posX": -1,
+        "depth": -9,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": false
+      }
+    }
+  }
+}

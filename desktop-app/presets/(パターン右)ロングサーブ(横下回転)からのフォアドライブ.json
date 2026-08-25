@@ -1,0 +1,63 @@
+{
+  "name": "(パターン右)ロングサーブ(横下回転)からのフォアドライブ",
+  "values": {
+    "length": 140,
+    "serveLeftHanded": false,
+    "receiveLeftHanded": false,
+    "totalShots": 4,
+    "shots": {
+      "1": {
+        "posX": 55,
+        "depth": -10,
+        "height": 17,
+        "delayMs": 100,
+        "angle": 18,
+        "tiltX": 80,
+        "rollAngle": -25,
+        "swingDir": -10,
+        "swingY": 0,
+        "swingSpeed": 1.7,
+        "backhand": false
+      },
+      "2": {
+        "posX": -75,
+        "depth": -8,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 16,
+        "tiltX": 80,
+        "rollAngle": 0,
+        "swingDir": -40,
+        "swingY": 0,
+        "swingSpeed": 1.5,
+        "backhand": false
+      },
+      "3": {
+        "posX": 0,
+        "depth": -24,
+        "height": 5,
+        "delayMs": 70,
+        "angle": -6,
+        "tiltX": 85,
+        "rollAngle": -20,
+        "swingDir": 75,
+        "swingY": 10,
+        "swingSpeed": 0.8,
+        "backhand": false
+      },
+      "4": {
+        "posX": 15,
+        "depth": -31,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": true
+      }
+    }
+  }
+}

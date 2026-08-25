@@ -1,0 +1,37 @@
+{
+  "name": "(サーブ)左利き横左下ショート",
+  "values": {
+    "length": 75,
+    "serveLeftHanded": true,
+    "receiveLeftHanded": false,
+    "totalShots": 2,
+    "shots": {
+      "1": {
+        "posX": -53,
+        "depth": -7,
+        "height": 26,
+        "delayMs": 100,
+        "angle": -12,
+        "tiltX": 90,
+        "rollAngle": -15,
+        "swingDir": -10,
+        "swingY": -15,
+        "swingSpeed": 2,
+        "backhand": false
+      },
+      "2": {
+        "posX": 0,
+        "depth": 0,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 90,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 0,
+        "backhand": true
+      }
+    }
+  }
+}

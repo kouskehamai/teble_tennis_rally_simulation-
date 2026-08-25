@@ -1,0 +1,11 @@
+# 依存パッケージ(npm installで復元できるため追跡しない)
+desktop-app/node_modules/
+
+# ビルド生成物(npm run buildで再生成できるため追跡しない。
+# 配布用インストーラーはGitHub Releasesなどでの配布を想定)
+desktop-app/dist/
+*.exe
+
+# OS/エディタ由来
+.DS_Store
+Thumbs.db

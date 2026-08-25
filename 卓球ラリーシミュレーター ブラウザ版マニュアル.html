@@ -1,0 +1,1063 @@
+<title>ラリーシミュレーター操作マニュアル</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=BIZ+UDPGothic:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     トークン — ライト/ダーク両対応
+     卓球台の青・ラバーの赤を軸にした配色。中間色は緑みを少し残した
+     グレー（体育館の床・コートの余白を意識）にして、既定のニュートラル
+     グレーから外す。
+     ============================================================ */
+  :root {
+    --bg: #f1f4ee;
+    --surface: #ffffff;
+    --surface-alt: #e8ede3;
+    --ink: #182530;
+    --ink-soft: #566270;
+    --ink-faint: #8a97a0;
+    --accent: #14588f;
+    --accent-strong: #0d456f;
+    --accent-tint: #dbe9f4;
+    --rubber: #b5303f;
+    --rubber-tint: #f7e2e3;
+    --line: #d9dfd2;
+    --chip-bg: #182530;
+    --chip-ink: #dce9f3;
+    --shadow: 0 1px 2px rgba(20, 30, 20, 0.06), 0 10px 26px rgba(20, 30, 20, 0.07);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0c1116;
+      --surface: #131c24;
+      --surface-alt: #18222b;
+      --ink: #e8edf0;
+      --ink-soft: #9fadb7;
+      --ink-faint: #66757e;
+      --accent: #63b6ec;
+      --accent-strong: #92cff5;
+      --accent-tint: #163650;
+      --rubber: #ef7b84;
+      --rubber-tint: #3a1c20;
+      --line: #253039;
+      --chip-bg: #060b10;
+      --chip-ink: #bfdcef;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px rgba(0, 0, 0, 0.4);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0c1116;
+    --surface: #131c24;
+    --surface-alt: #18222b;
+    --ink: #e8edf0;
+    --ink-soft: #9fadb7;
+    --ink-faint: #66757e;
+    --accent: #63b6ec;
+    --accent-strong: #92cff5;
+    --accent-tint: #163650;
+    --rubber: #ef7b84;
+    --rubber-tint: #3a1c20;
+    --line: #253039;
+    --chip-bg: #060b10;
+    --chip-ink: #bfdcef;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px rgba(0, 0, 0, 0.4);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic UI", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.9;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  html, body { overflow-x: hidden; }
+
+  h1, h2, h3 { text-wrap: balance; font-family: "Zen Kaku Gothic New", "Hiragino Sans", sans-serif; }
+
+  a { color: var(--accent); }
+
+  .mono, code, .kbd, .unit {
+    font-family: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+
+  code, .path {
+    font-size: 0.86em;
+    overflow-wrap: anywhere;
+    background: var(--surface-alt);
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+  }
+
+  /* ---- スマホ非対応の注記 ---- */
+  .mobile-notice {
+    background: var(--rubber);
+    color: #fff;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.86rem;
+    line-height: 1.6;
+    padding: 10px 16px;
+  }
+
+  /* ============================================================
+     骨格
+     ============================================================ */
+  .shell {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 48px 24px 130px;
+  }
+
+  /* ---- 目次：常に画面に表示され続けるよう、sticky ではなく viewport 基準の
+     fixed にする（sticky は埋め込み先の外側コンテナのスクロール構造次第で
+     効かなくなることがあるため、より確実な方法にした）。left は「.shellが
+     画面中央寄せされた時の内側の余白の位置」と同じ式で計算し、通常時の
+     見た目の位置をそのまま保つ。.docにはtocの幅+gap分の左マージンを別途
+     持たせて、本文が潜り込まないようにする。 */
+  .toc {
+    position: fixed;
+    top: 40px;
+    left: max(24px, calc((100vw - 1060px) / 2 + 24px));
+    width: 216px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+  }
+
+  .toc-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    color: var(--ink-faint);
+    margin: 0 0 10px 10px;
+    font-family: "Zen Kaku Gothic New", sans-serif;
+    font-weight: 700;
+  }
+
+  .toc a {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-size: 0.86rem;
+  }
+
+  .toc a:hover { background: var(--surface-alt); color: var(--ink); }
+
+  .toc a .num {
+    font-size: 0.72rem;
+    color: var(--accent);
+    min-width: 1.5em;
+  }
+
+  .doc { min-width: 0; max-width: 740px; margin-left: 272px; }
+
+  .masthead {
+    margin-bottom: 48px;
+    display: flex;
+    align-items: flex-start;
+    gap: 22px;
+  }
+
+  .court-mark {
+    flex: none;
+    width: 76px;
+    height: 60px;
+    margin-top: 6px;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.74rem;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 12px;
+    font-family: "Zen Kaku Gothic New", sans-serif;
+  }
+
+  .eyebrow::before {
+    content: "";
+    width: 18px;
+    height: 2px;
+    background: var(--rubber);
+    display: inline-block;
+  }
+
+  h1.title {
+    font-size: 2rem;
+    font-weight: 900;
+    letter-spacing: -0.01em;
+    margin: 0 0 12px;
+  }
+
+  .lede {
+    color: var(--ink-soft);
+    font-size: 1.02rem;
+    max-width: 60ch;
+    margin: 0;
+  }
+
+  section.block {
+    margin-top: 62px;
+    padding-top: 4px;
+    scroll-margin-top: 24px;
+  }
+
+  .block-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 8px;
+  }
+
+  .block-head .idx {
+    font-size: 0.92rem;
+    color: var(--accent);
+    font-weight: 700;
+    flex: none;
+  }
+
+  h2.block-title {
+    font-size: 1.3rem;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  .block-desc {
+    color: var(--ink-soft);
+    margin: 6px 0 26px;
+    max-width: 58ch;
+  }
+
+  h3.sub {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 30px 0 12px;
+    color: var(--ink);
+  }
+
+  p { margin: 0 0 14px; }
+
+  /* ---- 手順ステップ ---- */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .step {
+    display: grid;
+    grid-template-columns: 38px 1fr;
+    gap: 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+
+  .step .num {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1.4;
+  }
+
+  .step h4 {
+    margin: 0 0 6px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .step p { margin: 0; color: var(--ink-soft); }
+  .step p + p { margin-top: 8px; }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--chip-bg);
+    color: var(--chip-ink);
+    padding: 6px 12px;
+    border-radius: 7px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .chip.accent { background: #1a7a4a; color: #fff; }
+  .chip.blue { background: var(--accent); color: #fff; }
+  .chip.red { background: var(--rubber); color: #fff; }
+  .chip.grey { background: #64748b; color: #fff; }
+
+  /* ---- 注意/警告カード ---- */
+  .callout {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 12px;
+    background: var(--surface-alt);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 18px 0;
+  }
+
+  .callout.warn {
+    border-left-color: var(--rubber);
+    background: var(--rubber-tint);
+  }
+
+  .callout .mark {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: var(--accent);
+    font-family: "Zen Kaku Gothic New", sans-serif;
+  }
+
+  .callout.warn .mark { color: var(--rubber); }
+
+  .callout p:last-child { margin-bottom: 0; }
+  .callout strong { color: var(--ink); }
+
+  /* ---- 画面構成マップ（台の模式図つき） ---- */
+  .layout-map {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr 1fr;
+    gap: 8px;
+    margin: 20px 0 8px;
+  }
+
+  .map-bar {
+    grid-column: 1 / -1;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    text-align: center;
+  }
+
+  .map-panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 14px;
+    min-height: 168px;
+  }
+
+  .map-panel .label {
+    font-weight: 700;
+    font-size: 0.86rem;
+    margin-bottom: 6px;
+  }
+
+  .map-panel .desc {
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+
+  .map-panel.center {
+    background: var(--chip-bg);
+    color: var(--chip-ink);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .map-panel.center .desc { color: #9db6cc; }
+
+  .mini-table {
+    width: 96px;
+    height: 62px;
+    background: linear-gradient(180deg, #1c78bb, #124a76);
+    clip-path: polygon(14% 0%, 86% 0%, 100% 100%, 0% 100%);
+    position: relative;
+  }
+  .mini-table::before {
+    content: "";
+    position: absolute;
+    left: 50%; top: 0; bottom: 0;
+    width: 2px;
+    background: rgba(255,255,255,0.55);
+    transform: translateX(-50%);
+  }
+  .mini-table::after {
+    content: "";
+    position: absolute;
+    left: -6%; right: -6%; top: 48%;
+    height: 8px;
+    background: rgba(255,255,255,0.22);
+    border-top: 1px solid rgba(255,255,255,0.5);
+  }
+
+  .mini-btn {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.72rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+  }
+  .mini-btn.grey { background: #64748b; }
+
+  /* ---- パラメータ表（①〜⑥） ---- */
+  .param-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 8px 0 4px;
+  }
+
+  .param-row {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    align-items: start;
+    padding: 13px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .param-row:first-child { border-top: none; }
+
+  .param-num {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--accent-tint);
+    color: var(--accent-strong);
+    font-weight: 800;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Zen Kaku Gothic New", sans-serif;
+  }
+
+  .param-name {
+    font-weight: 700;
+    font-size: 0.94rem;
+    margin-bottom: 3px;
+  }
+
+  .param-range {
+    color: var(--ink-faint);
+    font-size: 0.78rem;
+    margin-left: 6px;
+  }
+
+  .param-desc {
+    color: var(--ink-soft);
+    font-size: 0.88rem;
+  }
+
+  /* ---- 操作一覧 ---- */
+  .ctrl-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .ctrl-item {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .ctrl-item .chip { flex: none; margin-top: 2px; }
+
+  .ctrl-item .body p { margin: 0; color: var(--ink-soft); font-size: 0.92rem; }
+
+  /* ---- 最上部に戻るボタン（右下固定） ---- */
+  .back-to-top {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 12px;
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+  }
+
+  .back-to-top span {
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-family: "Zen Kaku Gothic New", sans-serif;
+    max-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: max-width 0.2s ease, margin 0.2s ease;
+  }
+
+  .back-to-top:hover span,
+  .back-to-top:focus-visible span {
+    max-width: 6em;
+    margin-right: 2px;
+  }
+
+  .back-to-top:hover,
+  .back-to-top:focus-visible {
+    background: var(--accent-strong);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .back-to-top span { transition: none; }
+  }
+
+  /* ---- フッター ---- */
+  footer {
+    margin-top: 84px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    color: var(--ink-faint);
+    font-size: 0.82rem;
+  }
+
+  /* ---- レスポンシブ ---- */
+  @media (max-width: 880px) {
+    .shell {
+      padding: 32px 18px 100px;
+    }
+    .doc {
+      max-width: none;
+      margin-left: 0;
+    }
+    .toc {
+      position: static;
+      max-height: none;
+      overflow-y: visible;
+      width: auto;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .toc-label { display: none; }
+    .toc a {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      font-size: 0.78rem;
+      padding: 6px 10px;
+    }
+    .layout-map { grid-template-columns: 1fr; }
+    .masthead { flex-direction: column; }
+  }
+
+  @media (max-width: 520px) {
+    .shell { padding: 22px 14px 80px; gap: 28px; }
+    h1.title { font-size: 1.5rem; }
+    .lede { font-size: 0.94rem; }
+    h2.block-title { font-size: 1.1rem; }
+    section.block { margin-top: 46px; }
+    .step { grid-template-columns: 26px 1fr; padding: 14px 16px; gap: 10px; }
+    .ctrl-item { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .ctrl-item .chip { white-space: normal; margin-top: 0; }
+    .param-row { grid-template-columns: 26px 1fr; gap: 10px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { scroll-behavior: auto !important; }
+  }
+
+  html { scroll-behavior: smooth; }
+
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media print {
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .mobile-notice { display: none; }
+    .back-to-top { display: none; }
+    .toc { display: none; }
+    .doc { margin-left: 0; max-width: none; }
+    section.block { break-inside: avoid-page; }
+    .step, .callout, .param-row, .ctrl-item { break-inside: avoid; }
+    @page { size: 1200px 1650px; margin: 16px; }
+  }
+</style>
+
+<div class="mobile-notice">⚠ このマニュアル自体はスマートフォンでも閲覧できますが、アプリ本体（卓球ラリーシミュレーター.html）の操作はマウスでのドラッグ操作を多用するため、パソコンでの利用を前提としています。</div>
+
+<a href="#top" class="back-to-top" aria-label="画面最上部に戻る">↑<span>TOP</span></a>
+
+<div class="shell" id="top">
+
+  <nav class="toc" aria-label="目次">
+    <p class="toc-label">目次</p>
+    <a href="#open"><span class="num mono">01</span>起動する</a>
+    <a href="#preset-dir"><span class="num mono">02</span>プリセットフォルダ</a>
+    <a href="#layout"><span class="num mono">03</span>画面の構成</a>
+    <a href="#panel"><span class="num mono">04</span>両サイドの設定パネル</a>
+    <a href="#params"><span class="num mono">05</span>面とスイングの6数値</a>
+    <a href="#rally"><span class="num mono">06</span>3球目以降を追加</a>
+    <a href="#canvas-ops"><span class="num mono">07</span>キャンバス上の操作</a>
+    <a href="#camera"><span class="num mono">08</span>カメラ角度・全画面</a>
+    <a href="#presets"><span class="num mono">09</span>プリセット</a>
+    <a href="#trouble"><span class="num mono">10</span>困ったとき</a>
+  </nav>
+
+  <div class="doc">
+
+    <header class="masthead">
+      <svg class="court-mark" viewBox="0 0 76 60" aria-hidden="true">
+        <polygon points="10,4 66,4 76,56 0,56" fill="#14588f"></polygon>
+        <line x1="38" y1="4" x2="38" y2="56" stroke="#fff" stroke-width="1.6" opacity="0.7"></line>
+        <rect x="-4" y="27" width="84" height="6" fill="#fff" opacity="0.25"></rect>
+        <circle cx="38" cy="10" r="3" fill="#b5303f"></circle>
+      </svg>
+      <div>
+        <p class="eyebrow">操作マニュアル</p>
+        <h1 class="title">卓球ラリーシミュレーター 操作マニュアル</h1>
+        <p class="lede">
+          サーブとレシーブの面の向き・スイングを数値で組み立てて、回転や弾道がどう変わるかを確かめる物理シミュレーターです。
+          ここでは起動から、両サイドの設定、キャンバス操作、プリセットの保存・呼び出しまでを順番に説明します。
+        </p>
+      </div>
+    </header>
+
+    <!-- ============================================================ -->
+    <section class="block" id="open">
+      <div class="block-head">
+        <span class="idx mono">01</span>
+        <h2 class="block-title">起動する</h2>
+      </div>
+      <p class="block-desc">受け取ったフォルダの中にある <span class="path mono">卓球ラリーシミュレーター.html</span> を開きます。</p>
+
+      <div class="steps">
+        <div class="step">
+          <span class="num">1</span>
+          <div>
+            <h4>フォルダを展開する</h4>
+            <p>ZIPで受け取った場合は、展開してからフォルダの中身を確認してください。</p>
+          </div>
+        </div>
+        <div class="step">
+          <span class="num">2</span>
+          <div>
+            <h4><span class="path mono">卓球ラリーシミュレーター.html</span> をダブルクリック</h4>
+            <p>普段使っているブラウザ（Chrome / Edge など）で開きます。インストールは不要で、このファイル単体で動作します。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="block" id="preset-dir">
+      <div class="block-head">
+        <span class="idx mono">02</span>
+        <h2 class="block-title">プリセットフォルダを選ぶ（最初の1回だけ）</h2>
+      </div>
+      <p class="block-desc">
+        <span class="path mono">卓球ラリーシミュレーター.html</span> を開いた直後、対応ブラウザでは確認のモーダルウィンドウが自動で表示されます。
+      </p>
+
+      <div class="steps">
+        <div class="step">
+          <span class="num">1</span>
+          <div>
+            <h4>「プリセットフォルダの選択」ウィンドウが出る</h4>
+            <p>ここでプリセットを保存しているフォルダ（例：このプロジェクト内の <span class="path mono">presets</span> フォルダ）を選ぶと、保存済みのプリセット一覧を読み込みます。</p>
+            <div class="callout">
+              <span class="mark">i</span>
+              <div>
+                <p>
+                  フォルダを選ぶと同時に、一覧のいちばん上にあるプリセットが自動で画面に反映されます。
+                  別のプリセットを使いたい場合は、上部のプルダウンから選び直してください（選んだ瞬間に切り替わります）。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="sub">どちらのボタンを選ぶか</h3>
+      <div class="ctrl-list">
+        <div class="ctrl-item">
+          <span class="chip accent">フォルダを選ぶ</span>
+          <div class="body">
+            <p>
+              OSのフォルダ選択ダイアログが開きます。展開したプロジェクトフォルダの中にある
+              <span class="path mono">presets</span> フォルダを選ぶと、そこに用意されているプリセット一覧がすぐに読み込まれます。
+              以後はファイルに保存する操作も、そのフォルダへ直接保存されるようになります（タブを閉じるまで有効）。
+            </p>
+          </div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip red">今回は選ばない</span>
+          <div class="body">
+            <p>
+              ウィンドウを閉じるだけで、フォルダの指定はスキップされます。プリセットの保存はダウンロード、
+              読み込みは「ファイルから読み込む」で都度行う形になります。後からいつでも「フォルダを選ぶ」ボタン
+              （<a href="#presets">09 プリセット</a>）で設定できます。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <span class="mark">!</span>
+        <div>
+          <p>
+            このウィンドウは <strong>Chrome や Edge などの対応ブラウザ</strong>でのみ表示されます。
+            Firefoxなど非対応ブラウザでは最初から表示されず、プリセットは常にファイルのダウンロード/選択で扱う形になります。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="block" id="layout">
+      <div class="block-head">
+        <span class="idx mono">03</span>
+        <h2 class="block-title">画面の構成</h2>
+      </div>
+      <p class="block-desc">
+        起動すると、上部に保存・再生系の操作バー、その下に3列のレイアウトが表示されます。
+        中央のキャンバスは、レシーバー（手前）から見た視点で固定されています。
+      </p>
+
+      <div class="layout-map">
+        <div class="map-bar">プリセットバー（名前入力・保存・呼び出し） &nbsp;/&nbsp; 再生速度・一時停止・表示倍率</div>
+        <div class="map-panel">
+          <div class="label">サーブ側パネル（左）</div>
+          <div class="desc">相手（奥）の設定を、<br>構える位置・面の姿勢・スイングを数値で入力します。</div>
+        </div>
+        <div class="map-panel center">
+          <div class="mini-table"></div>
+          <span class="mini-btn">サーブを打つ</span>
+          <span class="mini-btn grey">表示リセット</span>
+          <div class="desc">弾道・回転・バウンド地点をここに描画</div>
+        </div>
+        <div class="map-panel">
+          <div class="label">レシーブ側パネル（右）</div>
+          <div class="desc">自分（手前）の設定を、<br>ラケットはドラッグでも動かせます。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="block" id="panel">
+      <div class="block-head">
+        <span class="idx mono">04</span>
+        <h2 class="block-title">両サイドの設定パネル</h2>
+      </div>
+      <p class="block-desc">
+        左右のパネルは同じ構成です。サーブ側は奇数球（1・3・5…）、レシーブ側は偶数球（2・4・6…）を担当します。
+      </p>
+
+      <h3 class="sub">編集する球</h3>
+      <p>上部のプルダウンで、今どの球の設定を編集しているかを切り替えます。球数が増えても入力欄が増殖しないよう、常に同じ1組の欄を使い回す仕組みです。</p>
+
+      <h3 class="sub">構える位置</h3>
+      <div class="ctrl-list">
+        <div class="ctrl-item">
+          <span class="chip">左右位置</span>
+          <div class="body"><p>台の中心を <span class="mono">0</span> として、構える位置を左右にずらします（マイナスで左、プラスで右）。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip">奥行き位置</span>
+          <div class="body"><p>自分側の台端を <span class="mono">0</span> として、ネット方向へどれだけ入って構えるか。マイナスは台端より手前です。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip">打球の高さ</span>
+          <div class="body"><p>台面からどれくらいの高さで構えるかです。</p></div>
+        </div>
+      </div>
+      <div class="callout">
+        <span class="mark">i</span>
+        <div>
+          <p>
+            この3つは<strong>待機位置</strong>です。実際にボールを取りに行く動きは自動追従で行われるため、
+            打球のたびにここへ正確に移動するわけではありません。
+          </p>
+        </div>
+      </div>
+
+      <h3 class="sub">打点を遅らせる時間</h3>
+      <p>
+        相手コート側でボールがバウンドしてから、自動追従が実際に動き始めるまでの待ち時間です（1球目のサーブには無い項目です）。
+        長いほどボールが伸びて、場合によっては頂点を過ぎてから捉える、ライジング気味になりにくい打ち方になります。
+      </p>
+
+      <h3 class="sub">長さ（弾道距離）</h3>
+      <p>1球目（サーブ）のときだけ表示される項目です。数値が大きいほどボールが奥まで速く強く飛びます。</p>
+
+      <h3 class="sub">フォアハンド / バックハンド・左利き</h3>
+      <p>
+        ラバー面の色と、腕（肩・肘）の見た目を切り替えるチェックボックスです。①〜⑥の数値そのものの意味は変わりません。
+        このシミュレーターでは便宜上、<strong>フォア面を赤・バック面を黒</strong>で固定表示しています。
+      </p>
+
+      <div class="callout">
+        <span class="mark">i</span>
+        <div>
+          <p>
+            レシーブ側のラケットは、ボールが台でバウンドして近づくと<strong>自動で反応</strong>します。
+            その瞬間の①〜⑥の数値どおりに、返球の方向とバウンド地点が決まります。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="block" id="params">
+      <div class="block-head">
+        <span class="idx mono">05</span>
+        <h2 class="block-title">面とスイングの6つの数値</h2>
+      </div>
+      <p class="block-desc">
+        ラケット面の姿勢（①②③）と、スイングの進行方向（④⑤⑥）。この6つの組み合わせで、弾道と回転のすべてが決まります。
+      </p>
+
+      <h3 class="sub">ラケット面の姿勢（3軸）</h3>
+      <div class="param-grid">
+        <div class="param-row">
+          <span class="param-num">①</span>
+          <div><div class="param-name">ヨー角（左右ひねり）<span class="param-range mono">-80〜80°</span></div><div class="param-desc">面を左右に向ける角度。マイナスで左向き、プラスで右向き。</div></div>
+        </div>
+        <div class="param-row">
+          <span class="param-num">②</span>
+          <div><div class="param-name">ピッチ角（上下傾き）<span class="param-range mono">0〜180°</span></div><div class="param-desc">90°で面が垂直。数値が小さいほど面を寝かせて開き、上向き（下回転・ツッツキ向き）になります。</div></div>
+        </div>
+        <div class="param-row">
+          <span class="param-num">③</span>
+          <div><div class="param-name">ロール角（面ロール）<span class="param-range mono">-90〜90°</span></div><div class="param-desc">面を斜めにひねる角度。横回転のかかり方に影響します。</div></div>
+        </div>
+      </div>
+
+      <h3 class="sub">スイング進行方向（3軸）</h3>
+      <div class="param-grid">
+        <div class="param-row">
+          <span class="param-num">④</span>
+          <div><div class="param-name">縦スイング／Vz上下<span class="param-range mono">-90〜120°</span></div><div class="param-desc">スイングの上下方向。プラスで上へ、マイナスで下へ。面の向きと同じ0°だと「こする」動きが無く、回転はつきません。</div></div>
+        </div>
+        <div class="param-row">
+          <span class="param-num">⑤</span>
+          <div><div class="param-name">横スイング／Vy左右<span class="param-range mono">-160〜160°</span></div><div class="param-desc">スイングの左右方向。横回転の強さに影響します。</div></div>
+        </div>
+        <div class="param-row">
+          <span class="param-num">⑥</span>
+          <div><div class="param-name">前後スイング／Vx前進<span class="param-range mono">0〜20</span></div><div class="param-desc">ラケットを前に振る速さ。初速そのものに加えて、④⑤で「こする」角度がついている時ほど、この速さが速いほど回転量も増えます（10で最大）。</div></div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <span class="mark">i</span>
+        <div>
+          <p>
+            <strong>面の向き＝ボールが弾かれる方向</strong>、<strong>④⑤の角度＋⑥の速さ＝回転の向きと強さ</strong>、という役割分担です。
+            ①②③をどれだけ振っても、④⑤が0°のまま（＝こすっていない）だと回転はつきません。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="block" id="rally">
+      <div class="block-head">
+        <span class="idx mono">06</span>
+        <h2 class="block-title">3球目以降を追加する</h2>
+      </div>
+      <p class="block-desc">1球目（サーブ）・2球目（レシーブ）だけでなく、ラリーを続けて組み立てられます。(上限21球まで)</p>
+
+      <div class="ctrl-list">
+        <div class="ctrl-item">
+          <span class="chip accent">＋ 3球目を追加</span>
+          <div class="body"><p>サーブ側パネルのボタンです。押すたびに奇数球（3・5・7…）が1つずつ増え、「編集する球」で選んで個別に設定できます。レシーブ側には「＋ 4球目を追加」があり、同じように偶数球が増えます。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip red">－ 3球目を削除</span>
+          <div class="body"><p>末尾の球を1つ削除します。球が無い状態では表示されません。</p></div>
+        </div>
+      </div>
+
+      <p style="margin-top:20px;">現在の総球数は、キャンバス右上に「全<span class="mono">n</span>球」のバッジで表示されます。</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="block" id="canvas-ops">
+      <div class="block-head">
+        <span class="idx mono">07</span>
+        <h2 class="block-title">キャンバス上の操作</h2>
+      </div>
+      <p class="block-desc">中央の画面に重なって表示されているボタンと、マウス操作についてです。</p>
+
+      <div class="ctrl-list">
+        <div class="ctrl-item">
+          <span class="chip blue">サーブを打つ</span>
+          <div class="body"><p>現在の①〜⑥・構える位置の設定でサーブを開始します。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip grey">表示リセット</span>
+          <div class="body"><p>ボールとラケットの選択状態を、サーブ待機の状態に戻します。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip">ラケットをドラッグ</span>
+          <div class="body"><p>ラケットをクリックして選択すると、マウスでその場の位置を動かせます。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip">台中心の〇ハンドル</span>
+          <div class="body"><p>ドラッグすると表示位置（パン）を前後左右にずらせます。ダブルクリック、または後述の「表示位置リセット」で中央に戻ります。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip">再生速度</span>
+          <div class="body"><p>0.1〜1.0倍のスライダーです。回転や落下位置などの物理演算の結果には影響せず、アニメーションの再生速度だけを調整します。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip">⏸ 一時停止</span>
+          <div class="body"><p>物理演算・スイングアニメーションを止めます（一時停止中もラケットのドラッグ移動は可能です）。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip">表示倍率</span>
+          <div class="body"><p>0.6〜1.6倍。台・選手の見た目の大きさだけを拡大/縮小します。位置関係や物理演算には影響しません。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip">表示位置リセット</span>
+          <div class="body"><p>台中心ハンドルでずらした表示位置（パン）を中央に戻します。上の「表示リセット」とは別の機能です。</p></div>
+        </div>
+      </div>
+
+      <p style="margin-top:20px; color:var(--ink-soft); font-size:0.9rem;">
+        画面には、面の向き・スイング進行方向を示すゲージ、現在の回転（無回転／上回転／下回転／横回転）、直近のバウンド地点も
+        あわせて表示されます。
+      </p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="block" id="camera">
+      <div class="block-head">
+        <span class="idx mono">08</span>
+        <h2 class="block-title">カメラ角度・全画面表示</h2>
+      </div>
+      <p class="block-desc">キャンバス右下のパネルにまとまっています。</p>
+
+      <div class="ctrl-list">
+        <div class="ctrl-item">
+          <span class="chip">カメラ角度</span>
+          <div class="body"><p>台を中心にカメラを水平方向へ0°（正面）〜180°（反対側）まで回転させます。台・ネット・ボール・選手・ラケットすべてが一緒に回転し、位置関係や物理演算には影響しません。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip grey">正面に戻す</span>
+          <div class="body"><p>カメラ角度を0°に戻します。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip">⛶ 全画面表示</span>
+          <div class="body"><p>キャンバスを画面いっぱいに広げ、左右のパネルなどを隠します。<span class="kbd mono">Esc</span> キーでも解除できます。全画面中は、再生速度などの操作パネルがキャンバス下部にまとまって表示されます。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="block" id="presets">
+      <div class="block-head">
+        <span class="idx mono">09</span>
+        <h2 class="block-title">プリセットの保存・呼び出し</h2>
+      </div>
+      <p class="block-desc">
+        両パネルの①〜⑥・構える位置などの設定をひとまとめにして、JSONファイルとして保存・呼び出しします。
+        保存先は<span class="mono">localStorage</span>やDBではなく、手元の実ファイルです。
+      </p>
+
+      <div class="ctrl-list">
+        <div class="ctrl-item">
+          <span class="chip blue">ファイルに保存</span>
+          <div class="body"><p>プリセット名を入力してクリックすると、現在の設定をJSONファイルとして保存します。同名のファイルが既にある場合は、上書きしてよいか確認されます。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip">プルダウンで選択</span>
+          <div class="body"><p>一覧から選んだ瞬間に、そのプリセットの内容が画面へ反映されます。呼び出し専用のボタンはありません。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip">設定値リセット</span>
+          <div class="body"><p>画面上で行った変更を、選択中のプリセットのファイル内容に戻します。このタブ内の変更が破棄されるだけで、ファイル自体は書き換わりません。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip red">削除する</span>
+          <div class="body"><p>選んだプリセットを削除します（確認ダイアログが出ます）。保存フォルダ経由のプリセットは実ファイルも完全に削除され、元に戻せません。</p></div>
+        </div>
+        <div class="ctrl-item">
+          <span class="chip accent">フォルダを選ぶ</span>
+          <div class="body"><p>保存先・読み込み元のフォルダを、いつでも選び直せます（対応ブラウザのみ）。選んだ直後、一覧のいちばん上のプリセットが自動で反映されます。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section class="block" id="trouble">
+      <div class="block-head">
+        <span class="idx mono">10</span>
+        <h2 class="block-title">困ったとき</h2>
+      </div>
+
+      <div class="callout warn">
+        <span class="mark">!</span>
+        <div>
+          <p><strong>画面が真っ暗で、何も表示されない</strong></p>
+          <p>
+            ZIPで受け取った場合は、展開せずに中から直接 <span class="path mono">卓球ラリーシミュレーター.html</span> を開いていないか確認してください。
+            一度フォルダへ展開してから、そのフォルダの中の <span class="path mono">卓球ラリーシミュレーター.html</span> を開き直してください。
+          </p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <span class="mark">i</span>
+        <div>
+          <p><strong>推奨ブラウザ</strong></p>
+          <p>Google Chrome または Microsoft Edge の最新版を推奨します。「フォルダを選ぶ」機能は対応ブラウザのみで使えます。</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <span class="mark">i</span>
+        <div>
+          <p><strong>セキュリティについて</strong></p>
+          <p>
+            このアプリはインターネット通信を一切行わない、完全にオフラインで動くツールです。入力した数値やプリセットが
+            外部のサーバーへ送信されることはありません。
+          </p>
+          <p>
+            プリセットの保存・削除は、あなたが「フォルダを選ぶ」で明示的に許可したフォルダの中だけに限定されます。
+            ブラウザ自体の仕組み（File System Access API）により、そのフォルダの外にあるファイルには一切アクセスできないようになっています。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      卓球ラリーシミュレーター — 操作マニュアル
+    </footer>
+
+  </div>
+</div>

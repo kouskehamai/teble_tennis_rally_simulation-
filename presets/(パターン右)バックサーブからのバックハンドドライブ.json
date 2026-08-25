@@ -1,0 +1,63 @@
+{
+  "name": "(パターン右)バックサーブからのバックハンドドライブ",
+  "values": {
+    "length": 140,
+    "serveLeftHanded": false,
+    "receiveLeftHanded": false,
+    "totalShots": 4,
+    "shots": {
+      "1": {
+        "posX": 70,
+        "depth": -5,
+        "height": 22,
+        "delayMs": 100,
+        "angle": 34,
+        "tiltX": 85,
+        "rollAngle": 0,
+        "swingDir": -15,
+        "swingY": -20,
+        "swingSpeed": 0.5,
+        "backhand": true
+      },
+      "2": {
+        "posX": -64,
+        "depth": 19,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 34,
+        "tiltX": 80,
+        "rollAngle": 0,
+        "swingDir": -25,
+        "swingY": 5,
+        "swingSpeed": 1,
+        "backhand": false
+      },
+      "3": {
+        "posX": 63,
+        "depth": -11,
+        "height": 10,
+        "delayMs": 50,
+        "angle": 14,
+        "tiltX": 80,
+        "rollAngle": -35,
+        "swingDir": 110,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": true
+      },
+      "4": {
+        "posX": -8,
+        "depth": -7,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 95,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": true
+      }
+    }
+  }
+}

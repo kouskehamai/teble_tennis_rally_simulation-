@@ -1,0 +1,63 @@
+{
+  "name": "(パターン右)ハーフロングサーブ(下回転)からのフォアループドライブ",
+  "values": {
+    "length": 50,
+    "serveLeftHanded": false,
+    "receiveLeftHanded": false,
+    "totalShots": 4,
+    "shots": {
+      "1": {
+        "posX": 0,
+        "depth": -20,
+        "height": 25,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 60,
+        "rollAngle": 0,
+        "swingDir": -10,
+        "swingY": 0,
+        "swingSpeed": 5,
+        "backhand": false
+      },
+      "2": {
+        "posX": 1,
+        "depth": 36,
+        "height": 10,
+        "delayMs": 100,
+        "angle": 0,
+        "tiltX": 70,
+        "rollAngle": 0,
+        "swingDir": -20,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": false
+      },
+      "3": {
+        "posX": -2,
+        "depth": -20,
+        "height": 15,
+        "delayMs": 250,
+        "angle": 10,
+        "tiltX": 85,
+        "rollAngle": -10,
+        "swingDir": 90,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": false
+      },
+      "4": {
+        "posX": -62,
+        "depth": -5,
+        "height": 10,
+        "delayMs": 20,
+        "angle": 0,
+        "tiltX": 90,
+        "rollAngle": 0,
+        "swingDir": 0,
+        "swingY": 0,
+        "swingSpeed": 1,
+        "backhand": false
+      }
+    }
+  }
+}

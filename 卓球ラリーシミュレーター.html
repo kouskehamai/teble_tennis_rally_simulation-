@@ -1,0 +1,5226 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>卓球ラリーシミュレーター</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%F0%9F%8F%93</text></svg>">
+  <style>
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* .control/.control-row等のdisplay:flexが[hidden]の既定display:noneを打ち消して
+   しまう（同じ詳細度でクラスの方が後勝ちするため）ので、hidden属性を確実に効かせる。 */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  font-family: sans-serif;
+  background-color: #0f172a;
+  color: #f8fafc;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 10px;
+}
+
+.app {
+  width: 100%;
+  max-width: 1400px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+h1 {
+  text-align: center;
+  font-size: 1.4rem;
+  color: #38bdf8;
+}
+
+.main-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr 280px;
+  gap: 15px;
+  align-items: start;
+}
+
+.side-panel {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.side-panel h2 {
+  font-size: 1rem;
+  border-bottom: 2px solid #38bdf8;
+  padding-bottom: 4px;
+  color: #38bdf8;
+}
+
+.side-panel h3 {
+  font-size: 0.9rem;
+  color: #cbd5e1;
+  margin-top: 4px;
+}
+
+.control {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.control label {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  flex: 1;
+  line-height: 1.2;
+}
+
+.control input[type="number"] {
+  width: 64px;
+  flex: none;
+  background: #0f172a;
+  border: 1px solid #475569;
+  color: #fff;
+  padding: 4px 6px;
+  border-radius: 4px;
+  text-align: right;
+}
+
+/* チェックボックス2つを横並びにして高さを抑える（バックサーブ・左利きなど） */
+.control-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.value-with-unit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.value-with-unit input[type="number"] {
+  width: 56px;
+}
+
+.value-with-unit span {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.serve-button, .reset-button {
+  background: #0284c7;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.serve-button:hover {
+  background: #0369a1;
+}
+
+.reset-button {
+  background: #64748b;
+}
+
+.reset-button:hover {
+  background: #475569;
+}
+
+.spin-info {
+  background: rgba(15, 23, 42, 0.7);
+  padding: 8px;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 0.9rem;
+  border: 1px solid #334155;
+}
+
+/* キャンバスの上にオーバーレイ表示する（サーブを打つボタンを右下に置いたので、
+   ぶつからないよう左下に配置する）。キャンバスがCSS上で縮小されても位置が
+   ズレないよう、px指定ではなく元のキャンバス解像度(900x600)に対する割合で置く。 */
+.canvas-wrapper .spin-info {
+  position: absolute;
+  left: 1.1%;
+  bottom: 2.5%;
+  z-index: 2;
+}
+
+/* カメラ角度の操作パネル(ラベル・スライダー・現在値・リセットボタン)。左下の
+   .spin-infoとぶつからないよう右下に配置する。キャンバスがCSS上で縮小されても
+   位置がズレないよう、px指定ではなく元のキャンバス解像度(900x600)に対する割合で置く。
+   幅が足りない画面では中身が.canvas-wrapperのoverflow:hiddenで切れてしまわないよう、
+   flex-wrapで折り返せるようにしている。 */
+.canvas-wrapper .camera-yaw-controls {
+  position: absolute;
+  right: 1.1%;
+  bottom: 2.5%;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px 6px;
+  max-width: 94%;
+  background: rgba(15, 23, 42, 0.75);
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+}
+
+.canvas-wrapper .camera-yaw-controls input[type="range"] {
+  width: 100px;
+}
+
+.canvas-area {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+
+.canvas-wrapper {
+  position: relative;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #334155;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  /* 下のhintと横幅をそろえるため、どちらも同じ基準(canvas-areaの幅を上限900pxまで)で
+     決まるようにする（canvasはmax-width:100%でこの幅いっぱいに収まる）。 */
+  width: 100%;
+  max-width: 900px;
+}
+
+canvas {
+  display: block;
+  /* キャンバスの内部解像度(width/height属性=900x600)はJS側の座標計算のため固定のまま、
+     表示サイズだけを親要素の幅に収まるよう縮小する（アスペクト比はheight:autoで維持）。 */
+  max-width: 100%;
+  height: auto;
+}
+
+/* 「全画面表示」ボタンでcanvas-wrapper自体をFullscreen API経由で全画面化した時だけ、
+   canvas-wrapper/canvasを画面いっぱいに広げる。内部解像度(width/height属性)は
+   JS側(fullscreenchangeイベント)でwindow.innerWidth/Heightに合わせて書き換えており、
+   ここではCSS上の表示サイズだけを画面いっぱいにする。canvas-wrapperの子要素として
+   重ねている各種オーバーレイ(サーブボタン・カメラ角度パネルなど)は元々%指定の
+   position:absoluteなので、そのまま追従する。 */
+.canvas-wrapper:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.canvas-wrapper:fullscreen canvas {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+
+/* サーブボタンをキャンバスの外に積み上げず、キャンバスの上にオーバーレイ表示する
+   （キャンバスの高さがそのまま全体の高さになるようにする） */
+/* サーブ側「面の向き」「進行方向」HUDパネル(main.jsのdrawHudPanelでx:10,y:10,幅180,高さ100)
+   のすぐ下に置く。左下固定の現在の回転表示とはもう被らない。キャンバスが
+   CSS上で縮小されても位置がズレないよう、px指定ではなく元のキャンバス解像度(900x600)に
+   対する割合で置く。 */
+.canvas-wrapper .serve-button {
+  position: absolute;
+  top: 22%;
+  left: 1.1%;
+  z-index: 2;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+/* 「表示リセット」は「サーブを打つ」ボタンのすぐ下に置く（ボタンを小さくした分、詰めて配置） */
+.canvas-wrapper .reset-button {
+  position: absolute;
+  top: 30%;
+  left: 1.1%;
+  z-index: 2;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+/* 全画面表示の時だけ、「サーブを打つ」「表示リセット」を大きくして下部へ横並びで
+   配置し直す（通常表示は他のパネルとの兼ね合いで左上に小さく置いているが、全画面では
+   周りに何も無いので目立たせやすい）。左端は再生速度・表示倍率などのパネル
+   (下のplayback-controls)に譲り、その右に続ける形にする（両方とも独立に
+   position:absoluteのままなので、HTML構造は変えていない）。 */
+.canvas-wrapper:fullscreen .serve-button,
+.canvas-wrapper:fullscreen .reset-button {
+  top: auto;
+  bottom: 2.5%;
+  font-size: 0.8rem;
+  padding: 0 12px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  /* leftは固定値ではなくJS側(fullscreenchangeイベント、positionServeResetButtons())で
+     毎回計算して直接style.leftに入れる。playback-controlsとカメラ角度パネルは
+     どちらも中身依存の幅で位置が決まる(px指定ではない)ため、画面幅が変わっても
+     この2つのちょうど中間に来るよう、実測した矩形から動的に算出する。 */
+}
+
+/* 全画面表示の間だけ、再生速度・一時停止・表示倍率・表示位置リセット(通常は
+   canvas-wrapperの外の上部ツールバーにある)をJS側(fullscreenchangeイベント)で
+   canvas-wrapperの中へ実際に移動させて表示する(Fullscreen APIは全画面化した要素の
+   子孫しか描画しないため、外にある要素は非表示になってしまう。クローンではなく
+   同じ要素を移動させるので、値や見た目は常に同期したまま)。
+   「サーブを打つ」「表示リセット」より左に置き、上下位置はカメラ角度パネルと
+   揃える(bottom:2.5%。サーブを打つ・表示リセット側はbottom:4%のまま変えていない)。
+   段組みにすると高さは抑えられるが2行になってしまうため、1行(横一列)のままにする。 */
+.canvas-wrapper:fullscreen .playback-controls {
+  position: absolute;
+  top: auto;
+  bottom: 2.5%;
+  left: 1.1%;
+  right: auto;
+  transform: none;
+  z-index: 2;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  background: rgba(15, 23, 42, 0.75);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+}
+.canvas-wrapper:fullscreen .playback-controls button {
+  /* ボタン内の日本語テキストは、明示的にnowrapを指定しない限り文字と文字の間でも
+     折り返せてしまう(英単語のようなスペース区切りが無いため)。上のjustify-content:
+     centerによる「枠からはみ出す」動作を成立させるには、ボタンの中で先に折り返されて
+     しまわないようにする必要がある。 */
+  white-space: nowrap;
+}
+
+/* 通常表示ではplayback-group自体は箱を作らず(display:contents)、中身(ラベル・
+   入力欄・単位)がそのまま親の.playback-controlsの横一列flexに直接並ぶ(見た目は
+   このグループ分けを導入する前と完全に同じまま)。全画面表示の時だけ、このグループ
+   自体を1行のflexにして、中身が改行されずに横並びのままグリッドの1マスに収まる
+   ようにする。 */
+.playback-group {
+  display: contents;
+}
+.canvas-wrapper:fullscreen .playback-controls .playback-group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+/* 再生速度・表示倍率の入力欄は、全画面表示の時だけ高さを1.5倍にする
+   (通常表示での実測19px × 1.5 = 28.5px)。 */
+.canvas-wrapper:fullscreen #playbackSpeed,
+.canvas-wrapper:fullscreen #viewZoom {
+  height: 28.5px;
+}
+
+.hint {
+  background: #0f172a;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+/* canvas-area直下の操作ヒントだけ、canvas-wrapperと同じ基準(canvas-areaの幅を
+   上限900pxまで)にして幅をそろえる（.hintクラスは上部の「表示上のお約束」バナー
+   (.app-note)とも共有しているため、そちらには影響させないよう限定する）。 */
+.canvas-area > .hint {
+  width: 100%;
+  max-width: 900px;
+}
+
+.app-note {
+  text-align: center;
+  white-space: nowrap;
+  overflow-x: auto;
+  width: 100%;
+}
+
+.app-note strong {
+  color: #cbd5e1;
+  margin-right: 6px;
+}
+
+.shot-info {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #ffd84d;
+  min-height: 1.2em;
+}
+
+.preset-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 8px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 12px;
+  width: 100%;
+}
+
+.preset-edit-controls,
+.preset-load-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.preset-edit-controls {
+  grid-column: 1;
+}
+
+.preset-load-controls {
+  grid-column: 2;
+}
+
+.preset-status-controls {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.preset-status-controls .preset-message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 再生速度まわり(ラベル・入力欄・単位・一時停止ボタン)は、常に1行のまま扱う
+   （.preset-bar自体はflex-wrapで折り返すが、このグループの内部だけは折り返させず、
+   グループ単位で次の行へ回るようにすることで、バー全体の高さが余計に伸びるのを防ぐ）。 */
+.playback-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  grid-column: 2;
+  min-width: 0;
+}
+
+/* 「一つ前のパラメータに戻す」は画面左下に固定表示する（.statusの右下固定と対になる位置）。
+   position:fixedなのでスクロールしても常に同じ場所に留まる */
+.undo-bar {
+  position: fixed;
+  bottom: 15px;
+  left: 15px;
+  z-index: 50;
+}
+
+.preset-bar input[type="text"] {
+  background: #0f172a;
+  border: 1px solid #475569;
+  color: #fff;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.preset-bar select {
+  background: #0f172a;
+  border: 1px solid #475569;
+  color: #fff;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  max-width: 400px;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.preset-btn {
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: white;
+  transition: background 0.2s;
+}
+
+.preset-btn-save {
+  background: #0284c7;
+}
+.preset-btn-save:hover {
+  background: #0369a1;
+}
+
+.preset-btn-load {
+  background: #16a34a;
+}
+.preset-btn-load:hover {
+  background: #15803d;
+}
+
+.preset-btn-delete {
+  background: #dc2626;
+}
+.preset-btn-delete:hover {
+  background: #b91c1c;
+}
+
+/* 押せないボタン(球の追加上限に達した時など)は、種類(save/load/delete)によらず
+   共通のグレー表示にする。.preset-btn-load/-save/-deleteの背景色・hover色より後ろに
+   書くことで、同じ詳細度でも上書きされるようにする。 */
+.preset-btn:disabled,
+.preset-btn:disabled:hover {
+  background: #64748b;
+  cursor: not-allowed;
+}
+
+.preset-message {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* display指定はブラウザ標準の[hidden]{display:none}より優先度が高く上書きしてしまうため、
+   hidden属性が付いているときは明示的にdisplay:noneへ戻す（JSのhidden切り替えが
+   見た目にも反映されるようにするための修正） */
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal-box {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 20px 24px;
+  max-width: 420px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.modal-box h3 {
+  color: #38bdf8;
+  margin-bottom: 10px;
+  font-size: 1.05rem;
+}
+
+.modal-box p {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.modal-box code {
+  background: #0f172a;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #ffd84d;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+
+/* ============================================================
+   レスポンシブ対応
+   ============================================================ */
+
+/* サーブ側パネル(280px) / キャンバス(1fr) / レシーブ側パネル(280px) の3カラムが
+   窮屈になる幅では、上から「サーブ側→キャンバス→レシーブ側」の順に1カラムで
+   縦積みする（HTML内の記載順のまま自然に積み上がる）。 */
+@media (max-width: 980px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .side-panel {
+    width: 100%;
+  }
+}
+
+/* スマートフォン幅では、余白・文字サイズを詰めて画面を有効に使う */
+@media (max-width: 480px) {
+  body {
+    padding: 6px;
+  }
+
+  .app {
+    gap: 8px;
+  }
+
+  h1 {
+    font-size: 1.15rem;
+  }
+
+  .side-panel {
+    padding: 10px;
+    font-size: 0.8rem;
+  }
+
+  .preset-bar {
+    padding: 8px;
+    grid-template-columns: 1fr;
+  }
+
+  .preset-edit-controls,
+  .preset-load-controls,
+  .preset-status-controls,
+  .playback-controls {
+    grid-column: 1;
+  }
+
+  .preset-bar input[type="text"] {
+    min-width: 0;
+    flex: 1;
+  }
+
+  /* お約束書きは、横スクロールさせずに折り返して読めるようにする */
+  .app-note {
+    white-space: normal;
+    overflow-x: visible;
+  }
+
+  .modal-box {
+    max-width: 90vw;
+    padding: 16px 18px;
+  }
+
+  /* キャンバス自体が小さく表示される分、上に重なるボタンもさらに小さくする */
+  .canvas-wrapper .serve-button,
+  .canvas-wrapper .reset-button {
+    padding: 3px 7px;
+    font-size: 0.65rem;
+    border-radius: 4px;
+  }
+
+  /* カメラ角度パネルも同様に詰める。幅が特に厳しいので「カメラ角度」ラベルは省略し
+     （スライダー自体にtitleで説明があるので操作は可能）、スライダー幅・ボタンの
+     余白も縮めて、左下の.spin-info(現在の回転表示)と重ならないようにする */
+  .canvas-wrapper .camera-yaw-controls {
+    padding: 3px 4px;
+    gap: 3px 4px;
+  }
+
+  .canvas-wrapper .camera-yaw-controls label {
+    display: none;
+  }
+
+  .canvas-wrapper .camera-yaw-controls .preset-message,
+  .canvas-wrapper .camera-yaw-controls .preset-btn {
+    font-size: 0.62rem;
+  }
+
+  .canvas-wrapper .camera-yaw-controls .preset-btn {
+    padding: 3px 6px;
+  }
+
+  .canvas-wrapper .camera-yaw-controls input[type="range"] {
+    width: 42px;
+  }
+}
+  </style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <h1 hidden>卓球ラリーシミュレーター</h1>
+
+
+
+  <!-- このアプリ独自の表示上の約束ごと。実際の卓球では選手が自由にフォア面/バック面の
+       ラバー色を選べる（黒をフォア面に使う選手もいる）が、このシミュレーターでは
+       画面表示の都合上「フォア面=赤・バック面=黒」に固定している旨を明示する。 -->
+  <div class="hint app-note">
+    <strong>表示上のお約束：</strong>
+    <span><strong>このシミュレーターでは便宜上、フォア面を赤・バック面を黒で表示しています（実際の卓球では、どちらの面をどちらの色にするかは選手の自由です）。</strong></span>
+  </div>
+
+
+
+
+  <!-- パラメータのプリセット保存・呼び出し。localStorageもDBも使わず、
+       実体は手元のJSONファイルとして保存・読み込みする（他の人にファイルごと渡せる）。
+       「保存フォルダを選ぶ」で例えばこのプロジェクト内の presets フォルダを指定すると、
+       以後はダイアログなしでそこへ直接保存・一覧表示される（対応ブラウザのみ。フォルダの
+       場所自体はどこにも保存されず、タブを閉じると選択は消える）。
+       一度読み込んだプリセットは、そのタブを開いている間だけメモリ上の一覧にも並ぶ。 -->
+  <div class="preset-bar">
+        <div class="preset-edit-controls">
+          <input id="presetName" type="text" placeholder="プリセット名を入力">
+          <button id="presetPickDirButton" class="preset-btn preset-btn-load" hidden>保存フォルダを選ぶ</button>
+          <button id="presetSaveButton" class="preset-btn preset-btn-save" >ファイルに保存</button>
+        </div>
+        <div class="preset-load-controls">
+          <button id="presetLoadFileButton" class="preset-btn preset-btn-load" hidden>ファイルから読み込む</button>
+          <input id="presetFileInput" type="file" accept="application/json,.json" style="display:none">
+          <select id="presetSelect">
+            <option value="">-- このタブで読み込んだプリセット --</option>
+          </select>
+          <button id="presetApplyButton" class="preset-btn preset-btn-load">フォルダを選ぶ</button>
+          <button id="presetResetButton" class="preset-btn preset-btn-load" title="画面上で行った変更を、選択中のプリセットのファイルに保存されている内容に戻します（このタブ内のin-memoryな変更のみ破棄され、ファイル自体は変更されません）">設定値リセット</button>
+          <button id="presetDeleteButton" class="preset-btn preset-btn-delete" title="保存フォルダ経由のプリセットは実ファイルも完全削除されます（元に戻せません）">削除する</button>
+        </div>
+        <div class="preset-status-controls">
+          <span id="presetDirStatus" class="preset-message"></span>
+          <span id="presetMessage" class="preset-message"></span>
+        </div>
+
+    <!-- 再生速度ラベル・入力欄・単位テキスト・一時停止ボタンは、常にひとまとまりで
+         同じ行に収まるよう、1つのflexコンテナにまとめて折り返し禁止にする
+         （途中で改行されるとバーの高さが余計に伸びてしまうため）。 -->
+    <div id="playbackControls" class="playback-controls">
+      <!-- playback-groupは、通常表示ではdisplay:contents(自分自身は箱を作らず、
+           中身がそのまま親のflex行に並ぶ)。全画面表示の時だけflexの行になり、
+           このグループの中(ラベル・入力欄・単位)は改行されず、グループ同士の
+           間だけ広めの余白を空けて縦に並ぶ(詳しくはCSS側のコメントを参照)。 -->
+      <div class="playback-group">
+        <label for="playbackSpeed" class="preset-message" style="white-space:nowrap;">再生速度</label>
+        <input id="playbackSpeed" type="number" min="0.1" max="1.0" step="0.05" value="0.6" title="回転や落下位置などの物理演算の結果には影響せず、アニメーションの再生速度だけを調整します">
+        <span class="preset-message" style="white-space:nowrap;">倍（大きいほど速い）</span>
+      </div>
+      <button id="pauseToggleButton" type="button" class="preset-btn preset-btn-load" title="物理演算・スイングアニメーションを一時停止/再開します（ラケットのドラッグ移動は一時停止中も操作できます）">⏸ 一時停止</button>
+      <div class="playback-group">
+        <label for="viewZoom" class="preset-message" style="white-space:nowrap;">表示倍率</label>
+        <input id="viewZoom" type="number" min="0.6" max="1.6" step="0.05" value="1" title="台・選手(ラケットや腕)の見た目の大きさだけを拡大/縮小します。位置関係や物理演算には影響しません">
+        <span class="preset-message" style="white-space:nowrap;">倍</span>
+      </div>
+      <button id="panResetButton" type="button" class="preset-btn preset-btn-load" title="台の中心にある〇のハンドルをドラッグすると、表示位置を前後左右にずらせます。ハンドルをダブルクリック、またはこのボタンで中央に戻します">表示位置リセット</button>
+    </div>
+  </div>
+
+  <!-- ページを開いた/リロードした直後に一度だけ出す、プリセットフォルダ選択モーダル。
+       ブラウザの仕様上フォルダへのアクセスには必ずユーザーの実際のクリックが要るため、
+       完全な自動読み込みはできない。その1クリックを「保存」のついでではなく、
+       ページを開いた最初のタイミングでまとめてお願いする形にしている。 -->
+  <div id="presetDirModal" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <h3>プリセットフォルダの選択</h3>
+      <p>プリセットを保存しているフォルダ（例: このプロジェクト内の <code>presets</code> フォルダ）を選ぶと、保存済みのプリセット一覧を読み込みます。</p>
+      <div class="modal-actions">
+        <button id="presetDirModalPick" class="preset-btn preset-btn-load">フォルダを選ぶ</button>
+        <button id="presetDirModalSkip" class="preset-btn preset-btn-delete">今回は選ばない</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-layout">
+
+    <!-- サーブ側  設定 -->
+    <section class="side-panel serve-panel">
+      <h2>サーブ側 (奥)</h2>
+
+      <!-- 1球目・3球目・5球目...(サーブ側が打つ奇数球)をここで切り替えて編集する。
+           球ごとに個別の入力欄を増やすのではなく、常に1組の入力欄を使い回すことで、
+           球数が増えてもパネルの高さが伸びないようにする。 -->
+      <h3>編集する球</h3>
+
+      <div class="control-row">
+        <select id="svShotSelect" title="編集する球を切り替えます"></select>
+        <button id="svShotAddBtn" class="preset-btn preset-btn-load" type="button">＋ 3球目を追加</button>
+        <button id="svShotRemoveBtn" class="preset-btn preset-btn-delete" type="button" hidden>－ 3球目を削除</button>
+      </div>
+
+      <h3>構える位置</h3>
+
+      <div class="control">
+        <label for="svShotPosX">左右位置</label>
+        <div class="value-with-unit">
+          <input id="svShotPosX" type="number" min="-100" max="100" step="5" value="0" title="台の中心を0として、構える位置を左右にずらします（マイナスで左、プラスで右）。実際にボールを取りに行く動きは自動追従で行われ、これは待機位置です">
+          <span>cm</span>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="svShotDepth">奥行き位置 (自陣端からの距離)</label>
+        <div class="value-with-unit">
+          <input id="svShotDepth" type="number" min="-150" max="150" step="5" value="-20" title="自分側の台端を0として、ネット方向へどれだけ入った位置で構えるか。マイナスは台端より手前（自分の体に近い側）">
+          <span>cm</span>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="svShotHeight">打球の高さ</label>
+        <div class="value-with-unit">
+          <input id="svShotHeight" type="number" min="-10" max="70" step="1" value="20" title="台面からどれくらいの高さで構えるか">
+          <span>cm</span>
+        </div>
+      </div>
+
+      <!-- 左右位置・高さは自動追従(実際のボール位置)にそのまま合わせるが、打つタイミング
+           (前後・奥行き方向にどれだけ伸ばしてから捉えるか)だけは意図的にずらしたい場合が
+           あるため、独立したパラメータにする。ボール位置そのものをずらす方式だと、
+           台の上で何回もバウンドする関係で「途中の1バウンド分だけ丸ごと遅れる/遅れない」
+           という飛び飛びの変化になってしまったため、実際に反応し始めるまでの待ち時間
+           (自動追従が実際にボールへ向かい始めた後にだけ効く)として持たせている。
+           1球目(サーブ)や、まだ実球を追いかけていない待機中には影響しない。 -->
+      <!-- 1球目(サーブ)は自動追従を使わない(ボールを直接構える位置に置いて打つ)ため、
+           1球目を編集中の時はこの項目自体を表示しない（JS側のfillPanelFromData()で
+           hiddenを切り替える）。 -->
+      <div class="control" id="svDelayControl">
+        <label for="svShotDelayMs">打点を遅らせる時間</label>
+        <div class="value-with-unit">
+          <input id="svShotDelayMs" type="number" min="-100" max="300" step="10" value="30" title="相手コート側でボールがバウンドしてから、自動追従が実際にボールを追いかけ始めるまでの待ち時間です。長いほどボールが伸びて(場合によっては頂点を過ぎて)から捉えるようになります。0なら待たずにすぐ追いかけます。左右位置・高さには影響しません">
+          <span>ms</span>
+        </div>
+      </div>
+
+      <!-- 長さ(弾道距離)は1球目(サーブ)の威力にのみ影響する値なので、1球目を編集中の
+           時だけ表示する（JS側のfillPanelFromData()でhiddenを切り替える）。 -->
+      <div class="control" id="lengthControl">
+        <label for="length">長さ (弾道距離)</label>
+        <div class="number-control">
+          <input id="length" type="number" min="-100" max="200" step="5" value="70" title="数値が大きいほど、ボールが奥まで速く強く飛びます（スイングの威力に大きく上乗せされます）。1球目(サーブ)にのみ影響します">
+        </div>
+      </div>
+
+      <div class="control-row">
+        <label class="checkbox-label">
+          <input id="svShotBackhand" type="checkbox" title="バック面（黒）を使う見た目に切り替えます（腕(肩・肘)も反対側に配置されます）。チェックを外すとフォア面（赤）です。①〜⑥の数値自体の意味は変わりません">
+          バックハンド
+        </label>
+        <label class="checkbox-label">
+          <input id="serveLeftHanded" type="checkbox" title="腕(肩・肘)を反対側に配置する見た目の切り替え。バック面と異なり、ラバー面の色は変わりません">
+          左利き
+        </label>
+      </div>
+
+      <h3>ラケット面の姿勢 (3軸)</h3>
+
+      <div class="control">
+        <label for="svShotAngle">① ヨー角 (左右ひねり)</label>
+        <div class="value-with-unit">
+          <input id="svShotAngle" type="number" min="-80" max="80" step="2" value="0" title="面を左右に向ける角度。マイナスで左向き、プラスで右向き">
+          <span>°</span>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="svShotTiltX">② ピッチ角 (上下傾き)</label>
+        <div class="value-with-unit">
+          <input id="svShotTiltX" type="number" min="0" max="180" step="5" value="90" title="90°で垂直。小さいほど面を寝かせて開き、上向き(下回転・ツッツキ向き)になる">
+          <span>°</span>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="svShotRollAngle">③ ロール角 (面ロール)</label>
+        <div class="value-with-unit">
+          <input id="svShotRollAngle" type="number" min="-90" max="90" step="5" value="0" title="面を斜めにひねる角度。横回転のかかり方に影響">
+          <span>°</span>
+        </div>
+      </div>
+
+      <h3>スイング進行方向 (3軸)</h3>
+
+      <div class="control">
+        <label for="svShotSwingDir">④ 縦スイング (Vz上下)</label>
+        <div class="value-with-unit">
+          <input id="svShotSwingDir" type="number" min="-90" max="120" step="5" value="0" title="スイングの上下方向。プラスで上へ、マイナスで下へ。0°(面の向きと同じ)だと「こする」動きが無いので回転はつかない">
+          <span>°</span>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="svShotSwingY">⑤ 横スイング (Vy左右)</label>
+        <div class="value-with-unit">
+          <input id="svShotSwingY" type="number" min="-160" max="160" step="5" value="0" title="スイングの左右方向。横回転の強さに影響。0°(面の向きと同じ)だと「こする」動きが無いので回転はつかない">
+          <span>°</span>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="svShotSwingSpeed">⑥ 前後スイング (Vx前進)</label>
+        <input id="svShotSwingSpeed" type="number" min="0" max="20" step="0.5" value="2.5" title="ラケットを前に振る速さ。初速に影響。④か⑤で面の向きからずらして「こする」角度をつけると、この速さが速いほど回転量も増える（10で最大）">
+      </div>
+
+    </section>
+
+
+    <!-- Canvas中央 (レシーバー目線アングル) -->
+    <main class="canvas-area">
+      <div class="canvas-wrapper">
+        <canvas id="canvas" width="900" height="600"></canvas>
+        <!-- サーブボタン・現在の回転表示はキャンバスの上にオーバーレイ表示する。
+             ステータスメッセージ表示は廃止した(setStatus()自体は残っているが、
+             対応する#status要素が無いので何も表示されない安全なno-opになる)。 -->
+        <button id="serveButton" class="serve-button">サーブを打つ</button>
+        <button id="resetButton" class="reset-button">表示リセット</button>
+        <div class="spin-info">
+          <!-- <span>現在の回転：</span> -->
+          <strong id="currentSpin">無回転</strong>
+        </div>
+        <!-- カメラ角度の操作パネルは、キャンバスの右下にオーバーレイ表示する
+             （現在の回転表示(.spin-info)を左下に置いているので、ぶつからないよう
+             右下に配置する）。 -->
+        <div class="camera-yaw-controls">
+          <label for="cameraYaw" class="preset-message" style="white-space:nowrap;">カメラ角度</label>
+          <input id="cameraYaw" type="range" min="0" max="180" step="10" value="0" title="台を中心にカメラを水平方向に0°(正面)〜180°(反対側から)まで回転させます。台・ネット・ボール・選手・ラケットすべてが一緒に回転します。位置関係や物理演算には影響しません">
+          <span id="cameraYawValue" class="preset-message" style="white-space:nowrap; min-width:3em;">0°</span>
+          <button id="cameraYawResetButton" type="button" class="preset-btn preset-btn-load" title="カメラ角度を正面(0°)に戻します">正面に戻す</button>
+          <button id="fullscreenToggleButton" type="button" class="preset-btn preset-btn-load" title="キャンバスを全画面表示にします（左右のパネルなどは隠れます。Escキーでも戻れます）">⛶ 全画面表示</button>
+        </div>
+      </div>
+
+      <div class="hint">
+        <p>ラケットをクリックして選択すると、マウスで位置を動かせます。ボールが台でバウンドしてラケットに近づくと自動で返球され、その瞬間の面の向き・スイングで返球方向とバウンド地点が決まります。台の中心の円をクリックして台を移動できます。</p>
+      </div>
+
+    </main>
+
+
+    <!-- レシーブ側  設定 -->
+    <section class="side-panel receive-panel">
+      <h2>レシーブ側 (手前)</h2>
+
+      <!-- 2球目・4球目・6球目...(レシーブ側が打つ偶数球)をここで切り替えて編集する。
+           サーブ側と同様、1組の入力欄を使い回すのでパネルの高さは伸びない。 -->
+      <h3>編集する球</h3>
+
+      <div class="control-row">
+        <select id="rcShotSelect" title="編集する球を切り替えます"></select>
+        <button id="rcShotAddBtn" class="preset-btn preset-btn-load" type="button">＋ 4球目を追加</button>
+        <button id="rcShotRemoveBtn" class="preset-btn preset-btn-delete" type="button" hidden>－ 4球目を削除</button>
+      </div>
+
+      <h3>構える位置</h3>
+
+      <div class="control">
+        <label for="rcShotPosX">左右位置</label>
+        <div class="value-with-unit">
+          <input id="rcShotPosX" type="number" min="-100" max="100" step="5" value="0" title="台の中心を0として、構える位置を左右にずらします（マイナスで左、プラスで右）。実際にボールを取りに行く動きは自動追従で行われ、これは待機位置です">
+          <span>cm</span>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="rcShotDepth">奥行き位置 (自陣端からの距離)</label>
+        <div class="value-with-unit">
+          <input id="rcShotDepth" type="number" min="-150" max="150" step="5" value="-15" title="自分側の台端を0として、ネット方向へどれだけ入った位置で構えるか。マイナスは台端より手前（自分の体に近い側）">
+          <span>cm</span>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="rcShotHeight">打球の高さ</label>
+        <div class="value-with-unit">
+          <input id="rcShotHeight" type="number" min="-10" max="70" step="1" value="20" title="台面からどれくらいの高さで構えるか">
+          <span>cm</span>
+        </div>
+      </div>
+
+      <!-- 左右位置・高さは自動追従(実際のボール位置)にそのまま合わせるが、打つタイミング
+           (前後・奥行き方向にどれだけ伸ばしてから捉えるか)だけは意図的にずらしたい場合が
+           あるため、独立したパラメータにする。ボール位置そのものをずらす方式だと、
+           台の上で何回もバウンドする関係で「途中の1バウンド分だけ丸ごと遅れる/遅れない」
+           という飛び飛びの変化になってしまったため、実際に反応し始めるまでの待ち時間
+           (自動追従が実際にボールへ向かい始めた後にだけ効く)として持たせている。
+           まだ実球を追いかけていない待機中には影響しない。 -->
+      <div class="control">
+        <label for="rcShotDelayMs">打点を遅らせる時間</label>
+        <div class="value-with-unit">
+          <input id="rcShotDelayMs" type="number" min="-100" max="300" step="10" value="30" title="相手コート側でボールがバウンドしてから、自動追従が実際にボールを追いかけ始めるまでの待ち時間です。長いほどボールが伸びて(場合によっては頂点を過ぎて)から捉えるようになり、ライジング気味になりにくくなります。0なら待たずにすぐ追いかけます。左右位置・高さには影響しません">
+          <span>ms</span>
+        </div>
+      </div>
+
+      <div class="control-row">
+        <label class="checkbox-label">
+          <input id="rcShotBackhand" type="checkbox" title="バック面（黒）を使う見た目に切り替えます（腕(肩・肘)も反対側に配置されます）。チェックを外すとフォア面（赤）です。①〜⑥の数値自体の意味は変わりません">
+          フォアハンド
+        </label>
+        <label class="checkbox-label">
+          <input id="receiveLeftHanded" type="checkbox" title="腕(肩・肘)を反対側に配置する見た目の切り替え">
+          左利き
+        </label>
+      </div>
+
+      <h3>ラケット面の姿勢 (3軸)</h3>
+
+      <div class="control">
+        <label for="rcShotAngle">① ヨー角 (左右ひねり)</label>
+        <div class="value-with-unit">
+          <input id="rcShotAngle" type="number" min="-80" max="80" step="2" value="0" title="面を左右に向ける角度。マイナスで左向き、プラスで右向き">
+          <span>°</span>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="rcShotTiltX">② ピッチ角 (上下傾き)</label>
+        <div class="value-with-unit">
+          <input id="rcShotTiltX" type="number" min="0" max="120" step="5" value="90" title="90°で台に対して垂直になる。 小さいほど面を寝かせて開き、上向き(下回転・ツッツキ向き)になる">
+          <span>°</span>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="rcShotRollAngle">③ ロール角 (面ロール)</label>
+        <div class="value-with-unit">
+          <input id="rcShotRollAngle" type="number" min="-90" max="90" step="5" value="0" title="面を斜めにひねる角度。横回転のかかり方に影響">
+          <span>°</span>
+        </div>
+      </div>
+
+      <h3>スイング進行方向 (3軸)</h3>
+
+      <div class="control">
+        <label for="rcShotSwingDir">④ 縦スイング (Vz上下)</label>
+        <div class="value-with-unit">
+          <input id="rcShotSwingDir" type="number" min="-90" max="120" step="5" value="0" title="スイングの上下方向。プラスで上へ、マイナスで下へ。0°(面の向きと同じ)だと「こする」動きが無いので回転はつかない">
+          <span>°</span>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="rcShotSwingY">⑤ 横スイング (Vy左右)</label>
+        <div class="value-with-unit">
+          <input id="rcShotSwingY" type="number" min="-160" max="160" step="5" value="0" title="スイングの左右方向。横回転の強さに影響。0°(面の向きと同じ)だと「こする」動きが無いので回転はつかない">
+          <span>°</span>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="rcShotSwingSpeed">⑥ 前後スイング (Vx前進)</label>
+        <input id="rcShotSwingSpeed" type="number" min="0" max="20" step="0.5" value="0.5" title="ラケットを前に振る速さ。返球の勢いに影響。④か⑤で面の向きからずらして「こする」角度をつけると、この速さが速いほど回転量も増える（10で最大）。速い入射球は振らずに当てるだけの「ブロック」が基本">
+      </div>
+
+    </section>
+
+
+
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// 物理定数・卓球ルールに基づく寸法定義
+// すべて実世界の単位（メートル / 秒 / kg）で管理する。
+// 画面への変換（メートル→ピクセル）は main.js の描画層だけで行う。
+// ============================================================
+
+const PHYS = {
+  // --- 重力・空気 ---
+  GRAVITY: 9.81,          // m/s^2
+  AIR_DENSITY: 1.2,       // kg/m^3 (室温・海抜0m付近)
+  DRAG_COEFF: 0.40,       // 球の抗力係数（実測値に近い卓球ボールの目安）
+  LIFT_COEFF_MAX: 0.35,   // マグヌス揚力係数の飽和値
+  LIFT_COEFF_GAIN: 0.6,   // 揚力係数 = min(MAX, GAIN * スピン比)
+  // 横回転(spin.z)が弾道を曲げる強さにかける補正倍率。「横回転を掛けた時の弾道への
+  // 影響」「横回転を受けて返球した時の弾道への影響」がどちらも実際の感覚より強すぎる
+  // という指摘を受けて導入。1.0で無補正、0.5で半分に弱まる。上回転・下回転(spin.x、
+  // マグヌス効果の上下方向やラケットのギア効果)や、回転の数値そのもの(表示・
+  // ball.spinの値・ボール表面の見た目の回転)には一切手を付けず、横回転が実際に
+  // 弾道を横へ曲げる/逸らす力だけをこの倍率で弱める。使用箇所は3つ:
+  // (1) integrateFlightのマグヌス効果(=横回転を掛けて飛んでいる間の弾道の曲がり)、
+  // (2) racketImpact内のcollide()呼び出し(=入射する横回転を受けて打ち返す時の
+  //     ラケット面での滑り・跳ね返り)、(3) racketImpact/tableBounceの「横方向の
+  //     ギア効果」(追加の横キック、上限値も同じ倍率で一緒に絞る。絞らないと強い
+  //     横回転では上限に張り付いたまま=効きが弱まって見えない)。
+  SIDESPIN_CURVE_FACTOR: 0.5,
+
+  // --- ボール（ITU規格 40mm プラボール）---
+  BALL_RADIUS: 0.02,      // m (直径40mm)
+  BALL_MASS: 0.0027,      // kg (2.7g)
+
+  // --- 卓球台・ネット（国際規格）---
+  TABLE_LENGTH: 2.74,     // m (奥行き全長)
+  TABLE_WIDTH: 1.525,     // m (横幅)
+  NET_HEIGHT: 0.1525,     // m
+  TABLE_Z: 0,             // 台面の高さ基準
+
+  // --- 台のバウンド特性 ---
+  TABLE_RESTITUTION: 0.87,// 台面の反発係数
+  // 台面とボールの摩擦係数。高いほど「無回転で打っても台のバウンドで意図しない回転が
+  // 発生してしまう」度合いが強くなる一方、下げすぎると強い回転(下回転など)がバウンドで
+  // 押し戻される現象が働かなくなる。両立できるギリギリの下限が0.15付近だったため、
+  // その安全地帯まで下げてバランスを取っている。
+  TABLE_FRICTION: 0.05,
+
+  // --- ラケットの反発特性（裏ソフトラバー + スポンジ）---
+  // 現代の高弾性テンション系ラバー（スポンジの張力による「カタパルト効果」で、単純な
+  // 反発係数だけのモデルより弾む感覚に近い）を想定し、理論上の完全弾性(1.0)に近い値まで上げている。
+  RACKET_RESTITUTION: 0.97,
+  RACKET_HIT_RADIUS: 0.15,  // m ラケット面とみなす当たり判定半径（腕を伸ばして届く分の余裕を含む）
+
+  // --- 現実的な上限（スライダーを極端な組み合わせにしても物理的にありえない結果にならないための安全弁）---
+  // トップ選手のスマッシュの打球速度は実測でおよそ時速100km(≒28m/s)前後、記録的な打球でも30m/s程度とされる。
+  // スピン量もトップ選手の強烈なスピンサーブで毎秒130〜150回転程度が目安。それぞれ十分な余裕を持たせて上限を設ける。
+  MAX_BALL_SPEED: 40,      // m/s
+  MAX_SPIN: 9000,           // rad/s (約143回転/秒)
+
+  // --- ボールの慣性モーメント（薄い中空球殻）---
+  get BALL_INERTIA() {
+    return (2 / 3) * this.BALL_MASS * this.BALL_RADIUS * this.BALL_RADIUS;
+  },
+
+  // --- サーブのトス ---
+  // ITTFルールでは、サーブは掌の上からボールを16cm以上まっすぐ投げ上げ、
+  // 落ちてくるところを打たなければならない。ここではボールが静止状態から
+  // 打たれるのではなく、トスから落下してきた分の下向き速度を持った状態で
+  // ラケットに当たる、という所まで簡易的に再現する。
+  SERVE_TOSS_HEIGHT: 0.32, // m（実戦でもよく見られる高めのトス）
+  get SERVE_TOSS_SPEED() {
+    return Math.sqrt(2 * this.GRAVITY * this.SERVE_TOSS_HEIGHT);
+  }
+};
+
+// ネットは台の中央（奥行き方向の中点）に張られる
+PHYS.NET_Y = PHYS.TABLE_LENGTH / 2;
+
+// 観戦しやすいよう、物理演算はそのままにアニメーションだけ実時間よりゆっくり進める。
+// 「再生速度」スライダーから直接書き換えられるよう、constではなくletにしている
+// （物理演算自体はPHYSICS_DTの固定ステップで進むため、この値をいくつにしても
+// 回転量・落下位置などの計算結果は一切変わらず、実時間に対する再生の速さだけが変わる）。
+let SLOW_MOTION = 0.6;
+
+// canvas内の台・選手(ラケットや腕)の見た目の大きさをまとめて拡大/縮小する表示倍率。
+// 「表示倍率」入力欄から直接書き換えられるよう、constではなくletにしている。
+// project()で画面中央(canvas.width/2, canvas.height/2)を基準に全ての描画位置・大きさへ
+// 掛けるだけなので、実際のワールド座標(m単位)や物理演算の結果には一切影響しない。
+let VIEW_ZOOM = 1;
+
+// 台の中心(表示上の基準点)を前後左右にずらす表示位置オフセット(px単位)。
+// 台の中心にあるドラッグハンドルをつかんで動かすと更新される。VIEW_ZOOMと同じく
+// project()内で全ての描画位置へ一律に加算するだけなので、実際のワールド座標
+// (m単位)や物理演算の結果には一切影響しない、あくまで見た目上の視点移動。
+let PAN_X = 0;
+let PAN_Y = 0;
+
+// カメラを台の中心まわりに水平方向(鉛直軸=世界のZ軸まわり)に回すアングル(度)。
+// 「カメラ角度」スライダーから直接書き換えられるようletにしている。project()内で
+// 台の中心を軸にx,y(共に世界の水平面上の座標)を回転させてから、これまで通りの
+// 疑似遠近法の計算に渡す。この1箇所を回すだけで、台・ネット・ボール・着地点
+// マーカーはもちろん、選手の腕・胴体もワールド座標(m)ベースで組み立て直した
+// おかげで一緒に正しく回転する(computeRacketGeometry()を参照)。
+// ワールド座標・物理演算そのものには一切影響しない、あくまで見た目上のカメラ回転。
+let CAMERA_YAW = 0;
+
+// 「一時停止」ボタンで切り替える。trueの間はrender()内で物理演算・スイング
+// アニメーションの更新を止め、直前のフレームの見た目のまま静止させる
+// （描画自体は止めないので、ラケットのドラッグ移動(mousemoveリスナー)は
+// 一時停止中も引き続き反映される）。
+let isPaused = false;
+
+// 物理積分の固定ステップ幅（安定性のため小さく取り、1フレームで複数回まわす）
+const PHYSICS_DT = 1 / 240;
+</script>
+<script>
+// ============================================================
+// 3Dベクトル演算ユーティリティ（{x,y,z} の素朴なオブジェクトを使用）
+// ============================================================
+
+const Vec3 = {
+  zero() { return { x: 0, y: 0, z: 0 }; },
+
+  add(a, b) { return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }; },
+  sub(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; },
+  scale(a, s) { return { x: a.x * s, y: a.y * s, z: a.z * s }; },
+
+  dot(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; },
+  cross(a, b) {
+    return {
+      x: a.y * b.z - a.z * b.y,
+      y: a.z * b.x - a.x * b.z,
+      z: a.x * b.y - a.y * b.x
+    };
+  },
+
+  length(a) { return Math.sqrt(this.dot(a, a)); },
+
+  normalize(a) {
+    const len = this.length(a);
+    if (len < 1e-9) return { x: 0, y: 0, z: 0 };
+    return this.scale(a, 1 / len);
+  },
+
+  // Z軸まわりの回転（左右にひねる＝ヨー）
+  rotateZ(a, rad) {
+    const c = Math.cos(rad), s = Math.sin(rad);
+    return { x: a.x * c - a.y * s, y: a.x * s + a.y * c, z: a.z };
+  },
+
+  // X軸まわりの回転（上下に傾ける＝ピッチ）
+  rotateX(a, rad) {
+    const c = Math.cos(rad), s = Math.sin(rad);
+    return { x: a.x, y: a.y * c - a.z * s, z: a.y * s + a.z * c };
+  },
+
+  // Y軸まわりの回転（進行方向軸まわりにひねる＝ロール）
+  rotateY(a, rad) {
+    const c = Math.cos(rad), s = Math.sin(rad);
+    return { x: a.x * c + a.z * s, y: a.y, z: -a.x * s + a.z * c };
+  }
+};
+
+const deg2rad = d => (d * Math.PI) / 180;
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// "#rrggbb" 同士をtで線形補間し、"rgb(r, g, b)" を返す（ラケット面の色を
+// 赤↔黒のように連続的に変化させたい時に使う。0=hexA, 1=hexB）
+function lerpColorHex(hexA, hexB, t) {
+  const pa = parseInt(hexA.slice(1), 16), pb = parseInt(hexB.slice(1), 16);
+  const r = lerp((pa >> 16) & 255, (pb >> 16) & 255, t);
+  const g = lerp((pa >> 8) & 255, (pb >> 8) & 255, t);
+  const b = lerp(pa & 255, pb & 255, t);
+  return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+}
+</script>
+<script>
+// ============================================================
+// ボールの状態（すべて実世界の単位：メートル / 秒 / rad/s）
+// ============================================================
+
+function createBall() {
+  return {
+    pos: { x: 0, y: 0, z: PHYS.BALL_RADIUS },
+    vel: { x: 0, y: 0, z: 0 },
+    spin: { x: 0, y: 0, z: 0 }, // 角速度ベクトル (rad/s)。物理演算はこれで統一して扱う
+    spinPhase: { x: 0, z: 0 }, // 見た目用：角速度を積分した回転角(rad)。ボール表面の模様を回すのに使う
+    moving: false,
+    phase: "idle",        // "idle" | "serve" | "return"（直近の打球の向き。serve=サーブ側→レシーブ側、return=レシーブ側→サーブ側）
+    shotNumber: 0,         // 直近に打たれたショットの番号（1=サーブ, 2=レシーブ, 3, 4, ...）
+    bounceCount: 0,        // 直近のショット以降にバウンドした回数
+    bouncedOwnSide: false,  // (1球目=サーブのみ使用) サーブがまず自陣でバウンドしたか（ルール判定用）
+    bouncedTargetSide: false, // 直近のショットが、向かうべき側で一度でもバウンドしたか（次に打つ側が反応してよいタイミングの判定用。サーブのフォルトで自陣バウンドを飛ばした場合も含む）
+    bouncedTargetSideTime: 0, // bouncedTargetSideが真になってからの経過時間(秒)。「打点を遅らせる時間」の判定に使う
+    netTouched: false,      // 直近のショットでネットに触れたか
+    lastBounce: null,       // 直近のバウンド地点 {x, y, side}
+    trail: []
+  };
+}
+
+function resetBallToRacket(ball, racket) {
+  ball.moving = false;
+  ball.phase = "idle";
+  ball.shotNumber = 0;
+  ball.bounceCount = 0;
+  ball.bouncedOwnSide = false;
+  ball.bouncedTargetSide = false;
+  ball.netTouched = false;
+  ball.lastBounce = null;
+  ball.vel = { x: 0, y: 0, z: 0 };
+  ball.spin = { x: 0, y: 0, z: 0 };
+  ball.spinPhase = { x: 0, z: 0 };
+  ball.trail = [];
+  ball.pos = { x: racket.pos.x, y: racket.pos.y, z: racket.pos.z };
+}
+
+// UI表示用：角速度ベクトルを卓球で馴染みのある「上/下回転」「横回転」に分解する。
+// 上回転/下回転は、進行方向(どちらが最後に打ったか)も考慮して判定する。spin.xの
+// 符号だけで固定的に判定すると、レシーブ側で④縦スイングを上げるほど実際のドライブ
+// 回転(曲がり)は強まっているのに、表示上は逆に下回転が増えて見えてしまい、
+// ④を上げた時の効きが体感と逆になってしまう。これを優先し、サーブ→レシーブで
+// 同じ回転のままラベルが切り替わる（フラット同士の交換でもラベルが変わりうる）方は
+// 許容する。瞬間ごとのvel.yの符号だと、強い回転で飛行中にvel.yがほぼ0付近まで
+// 揺れた時に表示がちらつく恐れがあるため、より安定した「どちらが最後に打ったか」
+// (ball.phase: serve=サーブ側が+Yへ、return=レシーブ側が-Yへ)を基準にする。
+// racketImpact()のギア効果で使っているincomingTopBackと同じ符号規則にそろえる。
+function decomposeSpin(ball) {
+  const revPerSec = v => v / (2 * Math.PI);
+
+  const dir = (ball.phase === "return") ? -1 : 1; // 直近に打った側の進行方向(+Y/-Y)
+  const topBack = -dir * ball.spin.x; // 正=上回転, 負=下回転
+  const side = ball.spin.z;     // 正負で左右の向きを表す
+
+  return {
+    topBack: revPerSec(topBack),
+    side: revPerSec(side),
+    total: revPerSec(Vec3.length(ball.spin))
+  };
+}
+</script>
+<script>
+// ============================================================
+// ラケットの状態と、面の向き・スイング速度を実ベクトルとして求める処理
+// ============================================================
+
+const RECEIVER_HOME_Y = PHYS.TABLE_LENGTH + 0.15; // レシーバーの奥行き方向の定位置（返球後はここへ戻る）。台の端より手前(カメラ側)に立つ構えにするため、台の全長より外側にする
+const RECEIVER_HOME_Z = 0.16; // レシーバーの高さの定位置（返球後はここへ戻る）
+
+function createRacket(side) {
+  const forwardSign = side === "server" ? 1 : -1; // サーバー: +Y(レシーバー方向)へ, レシーバー: -Y(サーバー方向)へ
+  return {
+    side,
+    forwardSign,
+    pos: {
+      x: 0,
+      y: side === "server" ? 0.15 : RECEIVER_HOME_Y,
+      z: RECEIVER_HOME_Z
+    },
+    angle: 0,       // ①ヨー角 (面の左右向き, deg)
+    tiltX: 90,      // ②ピッチ角 (面の上下傾き, deg / 90=垂直=地面と垂直なレベルスイングの基本姿勢)
+    rollAngle: 0,   // ③ロール角 (面の進行軸まわりのひねり, deg)
+    swingDir: 0,    // ④縦スイング (スイング進行方向の上下角, deg)
+    swingY: 0,      // ⑤横スイング (スイング進行方向の左右角, deg)
+    swingSpeed: 5,  // ⑥前後スイング (スイングの速さ, 0-20 → m/sに変換。回転量もこの速さだけで決まる)
+    // 見た目のスイングアニメーション用：triggerSwing()が呼ばれた(=実際に打球した)瞬間の
+    // ④⑤⑥の値をここに保持する。アニメーションはこの値を使うので、打った後にスライダーを
+    // 動かしても、既に再生中/再生済みのスイングの見た目は変化しない。
+    swingDirAtHit: 0,
+    swingYAtHit: 0,
+    swingSpeedAtHit: 5,
+    powerMultiplier: 1, // サーブの「長さ」設定などで威力を上乗せする係数
+    selected: false,
+    swingProgress: null, // null=静止, 0〜1で実際に振っている最中
+    swingHoldElapsed: 0, // フォロースルー(swingProgress===1)で静止している時間(次の構えへ自動で戻すまでのタイマー)
+    backhand: false,   // サーブ側のみ使用：true でバックサーブの見た目(腕の左右・ラバー面の色)にする
+    leftHanded: false, // サーブ側のみ使用：true で左利きの見た目(腕の左右のみ。ラバー面の色は変わらない)にする
+    // このラケットが今どの球番号の設定を表しているか(1=サーブ, 2=レシーブ, 3以降)。
+    // syncServerRacketFromUI/syncReceiverRacketFromUI/playShot(n)/updateSideTrackingの
+    // 早期反映(isImmediateNext)など、その球の設定をracketへ反映するタイミングで
+    // 一緒に更新する。見た目の描画側(computeRacketGeometry)で「サーブの時」と
+    // 「3球目以降」を区別したい箇所(胴体シルエットの位置など)に使う。
+    activeShotNumber: side === "server" ? 1 : 2
+  };
+}
+
+// ラケット面の法線ベクトル（面が向いている方向の単位ベクトル）
+// ヨー(Z軸) → ピッチ(X軸) → ロール(進行軸=Y軸) の順に、基準の正面ベクトルを回転させる
+function racketNormal(racket) {
+  const base = { x: 0, y: racket.forwardSign, z: 0 };
+
+  // ピッチ: tiltX=90を基準姿勢(面が垂直=水平方向を向く)とし、小さいほど上向きに開く。
+  // 「開くと上向き」は現実のラケット操作としてサーブ側・レシーブ側で変わらない絶対的な
+  // 向き(上下)なのに、base.yにforwardSign(サーブ+1/レシーブ-1)を掛けた状態のまま
+  // X軸回転を掛けると、回転後のz成分（上下方向）の符号までforwardSignで反転してしまい、
+  // レシーブ側だけ「開く(tiltXを90より小さく)と逆に下向きに傾く」バグになっていた
+  // （①ヨーはforwardSignで符号が変わるのが正しい一方、②ピッチの上下はサーブ・レシーブ
+  // どちらでも同じ向きになるべきなので、pitch角自体にforwardSignを掛けて打ち消す）。
+  const pitch = deg2rad(90 - racket.tiltX) * racket.forwardSign;
+  let n = Vec3.rotateX(base, pitch);
+
+  // ヨー: 面を左右にひねる
+  n = Vec3.rotateZ(n, deg2rad(racket.angle));
+
+  // ロール: 進行方向の軸まわりに面をひねる（手首の返し）
+  n = Vec3.rotateY(n, deg2rad(racket.rollAngle));
+
+  return Vec3.normalize(n);
+}
+
+// スイング（ラケットを振る速度ベクトル）を実速度[m/s]で求める
+// swingSpeed=前進する速さ（角度を付けても目減りしない固定値）、
+// swingDir/swingYは、その前進速度に対して上下・左右に追加でどれだけ角度を付けて
+// 振っているか、という「上乗せ」の速度成分として加える。
+// （以前は球面座標的に合成していたため、角度を付けるほど前進成分がcos倍で減ってしまい、
+// 　少し角度を変えただけで⑥前後スイングを大きく調整し直す必要があって面倒だった）
+// ④⑤(こする角度)から生まれるこすり成分(x/z)は、トスの落下運動だけで自然に付く
+// バックスピン程度の量に埋もれてしまい、「上に振ればドライブ回転がかかる」という
+// 実際の卓球の実感が薄かった。実際のドライブ/カットは、面を合わせるだけでなく
+// 手首でしっかり「こする」ことで回転を強く生み出す動きなので、④⑤による
+// こすり成分にはBRUSH_GAINで上乗せし、トス落下分より明確に強い回転になるようにする。
+const BRUSH_GAIN = 8;
+
+// レシーブ側だけ、UI上の④=0(「上下にこすらないフラットな当て方」の見た目)でも、
+// デフォルトのサーブ設定(トスの落下で自然につく上回転)に対して無回転で返せるよう、
+// 実際の物理計算に渡す角度にだけこのオフセットを足す。見た目のスイング方向
+// (racketSwingDirection、HUD矢印・振り抜きアニメーション)はこの影響を受けないので、
+// UI上の表示・矢印は常に「入力した角度そのもの」を示し続ける。
+// ※サーブ側の②③⑥などの設定を変えると、④=0で相殺できる回転量も変わるため、
+// これはあくまで既定のサーブ設定に対する調整であることに注意。
+const RECEIVE_SWING_DIR_BIAS_DEG = 30;
+
+// サーブ側の3球目以降(ラリー中の打ち合い)にも、レシーブ側と同じ考え方でオフセットを
+// 足す。レシーブ側は常に「相手が打った球(何らかの回転を帯びている)を受ける」ため
+// この底上げが必要だったが、サーブ側の1球目(サーブそのもの)はトス(無回転)を打つだけで
+// 事情が違うため、1球目には適用しない。これが無いと、同じ④の数値でも3球目以降の
+// サーブ側だけグリップ率(racketFriction)が大きく低いままになり、レシーブ側の
+// 返球と比べて「同じように振っているのに回転のかかり方が弱すぎる/裏回転になりやすい」
+// という違和感が出ていた。
+const SERVE_RALLY_SWING_DIR_BIAS_DEG = 30;
+
+// racketSwingVelocity()・racketFriction()の両方で使う、物理計算向けの実効④角度。
+// グリップ率(racketFriction)の計算もこのオフセット込みの値で行わないと、見た目の
+// ④=0のままグリップ率だけ0(角度なし)扱いになってしまい、オフセットの効果が
+// 速度成分にしか反映されず狙った量まで打ち消せない。
+function effectiveSwingDir(racket) {
+  if (racket.side === "receiver") return racket.swingDir + RECEIVE_SWING_DIR_BIAS_DEG;
+  const isFirstServe = (racket.activeShotNumber || 1) === 1;
+  return racket.swingDir + (isFirstServe ? 0 : SERVE_RALLY_SWING_DIR_BIAS_DEG);
+}
+
+function racketSwingVelocity(racket) {
+  const speed = racket.swingSpeed * 1.2 * (racket.powerMultiplier || 1); // 0-20 → 最大24m/s程度まで（極端な設定も試せるよう、現実離れした速さまで許容）
+  const dirRad = deg2rad(effectiveSwingDir(racket));
+  const yRad = deg2rad(racket.swingY);
+
+  // ④⑤の「こすり」成分(x/z)には、以前はforwardSignを掛けて打ち消していたが、
+  // これは逆効果だったため撤去した。接触点(contactOffset)は面の法線(±Y)から
+  // 決まり、サーブ側(法線+Y)とレシーブ側(法線-Y)で自動的に符号が反転する。
+  // その結果、同じ絶対的な「上にこする」動き(z>0)でも、生まれるトルク
+  // (cross(contactOffset, Jt))の符号はサーブ側・レシーブ側で自然に反転し、
+  // ボールの飛んでいく向き(サーブ+Y／レシーブ-Y)もその分反転しているため、
+  // 実際に台に対して曲がる向き(マグヌス効果の向き)は絶対的な「上にこする＝
+  // ドライブ性の回転」のまま両側で一致する（打ち消す必要のあった非対称性は
+  // そもそも存在しなかった）。forwardSignを掛けて打ち消していたせいで、
+  // レシーブ側だけ実際には「④を上げるほどドライブ回転が弱まる」という、
+  // 見た目のスイング方向(racketSwingDirection、腕の振り抜きアニメーションは
+  // 元からforwardSignの影響を受けていない)とも矛盾した逆向きの効き方になっていた。
+  return {
+    x: speed * Math.sin(yRad) * BRUSH_GAIN,
+    y: racket.forwardSign * speed, // 角度(④⑤)を付けても前進速度はそのまま
+    z: speed * Math.sin(dirRad) * BRUSH_GAIN
+  };
+}
+
+// 見た目用：スイングの「向き」だけを、速さ(⑥)に関係なく求める。
+// racketSwingVelocity()は④⑤の角度成分もswingSpeedに掛け算しているため、⑥が0だと
+// ④⑤にどんな数字が入っていても方向ベクトルごと消えてしまい(0,0,0)、矢印や振り抜きの
+// アニメーションに④⑤の向きが一切反映されなかった。表示用の向きは常に④⑤の角度だけで
+// 決まるようにし、⑥は（別途）長さ・速さ側にのみ使う。
+// racketSwingVelocity()と同じく「y(前進)は常に一定、x/zは角度からの上乗せ」という
+// 加算方式にする（以前はVec3.normalize()で単位ベクトル化していたため、④か⑤で角度を
+// 付けるほどyの取り分がその分減ってしまい、④の動きと⑤の動きが画面上でどちらも
+// 「常に強く残る前進成分に少し足された変化」に見えてしまい、見分けにくかった）。
+function racketSwingDirection(racket) {
+  const dirRad = deg2rad(racket.swingDir);
+  const yRad = deg2rad(racket.swingY);
+  return {
+    x: Math.sin(yRad),
+    y: racket.forwardSign,
+    z: Math.sin(dirRad)
+  };
+}
+
+// ⑥前後スイング(swingSpeed, 0-20)の速さから、「完全に食いつく(理論上のフルスピン)場合に
+// 対して何割グリップできるか」の割合を求める。実際の卓球でも、速く振るほど強くこすれて
+// 回転がかかるので、専用の「こする量」パラメータは廃止し、スイング速度だけで決まるようにした。
+// 当たり方の角度に関わらず常に効果が出るよう、Physics.collide()には
+// frictionAsGripFraction=true で渡す（角度依存のクーロン摩擦係数だと、当たり方によっては
+// 上限に達しないまま速度を変えても回転量が変わらない、ということが起きるため）。
+// swingSpeed=10で理論上の最大(100%)に達し、それ以上は頭打ちになる。
+//
+// 加えて、④⑤(こする角度)自体が大きいほど、実際にはボールとの接触時間が長くなり
+// 「こすれ」も強くなるはず（この簡易衝突モデルは接触時間を扱っていないため、
+// 角度の大きさに応じてグリップ率自体を底上げすることで近似的に再現する）。
+// ⑥が遅くても④⑤の角度を大きく振れば、その分だけグリップが上がるようにする
+// （専用の「こする量」パラメータを別途増やすのではなく、既存の④⑤の値から自動で
+// 求める）。角度0のときはangleFrac=0となり、以前と全く同じ(speedFracのみ)になる。
+function racketFriction(racket) {
+  const speedFrac = clamp(racket.swingSpeed / 10, 0, 1);
+  const angleMag = Math.max(Math.abs(effectiveSwingDir(racket)), Math.abs(racket.swingY || 0));
+  // 30°でグリップ底上げが最大(100%)に達するようにする（以前は90°でようやく最大に
+  // 達する緩やかな傾きだったため、既存回転を相殺しきるのに④⑤を90°近くまで
+  // 振る必要があり、体感より弱すぎた）。
+  const angleFrac = clamp(angleMag / 30, 0, 1);
+  // 「どちらか一方が強ければしっかりグリップする」というOR的な組み合わせ
+  // (1-(1-a)(1-b)) にする。速度だけ・角度だけでも十分ならフルグリップに届く。
+  return clamp(1 - (1 - speedFrac) * (1 - angleFrac), 0, 1);
+}
+
+function triggerSwing(racket) {
+  racket.swingProgress = 0;
+  racket.swingHoldElapsed = 0; // フォロースルー姿勢で静止している時間(この回のスイング用にリセット)
+  // 見た目のスイングアニメーションは、打った瞬間の④⑤⑥の値で固定する。
+  racket.swingDirAtHit = racket.swingDir;
+  racket.swingYAtHit = racket.swingY;
+  racket.swingSpeedAtHit = racket.swingSpeed;
+  // 打った瞬間の「打点を遅らせる時間」も固定する(computeDelaySwingScale参照)。
+  racket.delaySecAtHit = racket.delaySec || 0;
+}
+
+// フォロースルー(swingProgress===1)で静止させておく時間。次の構えへ移動するまでの
+// 待ち時間としても使い、サーブ側・レシーブ側の両方で同じ間を取る。
+const SWING_HOLD_BEFORE_RESET = 0.5; // 秒
+
+function updateSwingAnimation(racket, dtScale, elapsedSec) {
+  if (racket.swingProgress === null) return;
+  if (racket.swingProgress >= 1) {
+    // フォロースルーの姿勢で少しだけ間を取ってから、スイング前の(構えの)角度へ
+    // 自動で戻す。
+    racket.swingHoldElapsed = (racket.swingHoldElapsed || 0) + elapsedSec;
+    if (racket.swingHoldElapsed >= SWING_HOLD_BEFORE_RESET) {
+      racket.swingProgress = null;
+      racket.swingHoldElapsed = 0;
+    }
+    return;
+  }
+  // ⑥前後スイングが速いほど、振り抜きの動き自体も素早く進むようにする
+  // （伸び幅=main.jsのreachMと合わせて、⑥は「速く・大きく」振れているように見える）
+  const speedFactor = 0.6 + clamp(racket.swingSpeed / 20, 0, 1) * 0.8; // 0.6〜1.4倍
+  // レシーブ側のフリック(④⑤の反応動作)は素早く(2.0倍)、サーブ側の振り抜き
+  // アニメーションはゆっくり(0.5倍)に、それぞれ基準の速さから調整する。
+  const sideFactor = racket.side === "receiver" ? 2.0 : 0.5;
+  racket.swingProgress += 0.09 * speedFactor * sideFactor * dtScale;
+  if (racket.swingProgress > 1) racket.swingProgress = 1;
+}
+</script>
+<script>
+// ============================================================
+// 卓球の実物理演算
+//  - 飛行中: 重力 + 空気抵抗 + マグヌス効果（回転による揚力・カーブ）
+//  - 衝突（ラケット面 / 台面）: 反発係数 + 摩擦によるインパルス衝突モデル
+//    → ここで「面の向き」「スイング方向」「こする量」「入射時の回転」から
+//      自然に回転・弾道が決まる（if分岐で回転を決め打ちしない）
+// ============================================================
+
+const Physics = {
+
+  // ---- 飛行中の力（重力・空気抵抗・マグヌス効果）を積分 ----
+  integrateFlight(ball, dt) {
+    const v = ball.vel;
+    const speed = Vec3.length(v);
+    const r = PHYS.BALL_RADIUS;
+    const A = Math.PI * r * r;
+
+    let accel = { x: 0, y: 0, z: -PHYS.GRAVITY };
+
+    if (speed > 1e-6) {
+      // 空気抵抗（進行方向と逆向き、速度の2乗に比例）
+      const dragTerm = 0.8 * PHYS.AIR_DENSITY * PHYS.DRAG_COEFF * A * speed;
+      const dragAccel = Vec3.scale(v, -dragTerm / PHYS.BALL_MASS);
+      accel = Vec3.add(accel, dragAccel);
+
+      // マグヌス効果（回転と速度に垂直な向きに働く力＝カーブ・浮き沈み）
+      // 横回転(z)だけPHYS.SIDESPIN_CURVE_FACTORで弱めた「見かけ上の回転」を使う。
+      // 上回転・下回転(x)はそのままなので、浮き沈みの効きには影響しない。
+      // ball.spin自体(実際の値・表示・見た目の回転)は変えず、曲がる力の計算だけに使う。
+      const spinForCurve = { x: ball.spin.x, y: ball.spin.y, z: ball.spin.z * PHYS.SIDESPIN_CURVE_FACTOR };
+      const spinRatio = (r * Vec3.length(spinForCurve)) / speed;
+      let liftCoeff = Math.min(PHYS.LIFT_COEFF_MAX, PHYS.LIFT_COEFF_GAIN * spinRatio);
+      // サーブ側(まだレシーバーが打っていない間=ball.phase==="serve")だけ、回転による
+      // 弾道への影響が強すぎるという指摘を受け半分に弱める。回転の数値そのもの
+      // (表示・レシーブ側の物理)には手を付けず、あくまで飛行中の曲がり方だけを抑える。
+      if (ball.phase === "serve") {
+        liftCoeff *= 0.5;
+      }
+      if (liftCoeff > 1e-6) {
+        const magnusDir = Vec3.normalize(Vec3.cross(spinForCurve, v));
+        const liftTerm = 0.5 * PHYS.AIR_DENSITY * liftCoeff * A * speed * speed;
+        accel = Vec3.add(accel, Vec3.scale(magnusDir, liftTerm / PHYS.BALL_MASS));
+      }
+    }
+
+    ball.vel = Vec3.add(ball.vel, Vec3.scale(accel, dt));
+    ball.pos = Vec3.add(ball.pos, Vec3.scale(ball.vel, dt));
+
+    // 見た目用：実際の角速度をそのまま積分し、ボール表面が本当に回転して見えるようにする
+    ball.spinPhase.x += ball.spin.x * dt;
+    ball.spinPhase.z += ball.spin.z * dt;
+
+    // 空気抵抗による回転の減衰はごくわずか
+    ball.spin = Vec3.scale(ball.spin, 1 - 0.04 * dt);
+  },
+
+  // ---- 統一衝突モデル：面(法線)に対する反発係数 e ・ 摩擦 friction でインパルス衝突を解く ----
+  // 面自体の速度(surfaceVel)・回転による接触点の滑り速度まで含めて正しく扱うので、
+  // ラケットでも台面でも同じ関数で「回転→反射角・反射スピン」が物理的に決まる。
+  //
+  // frictionAsGripFraction=false（台面）: frictionを実際のクーロン摩擦係数として扱い、
+  //   撃力の上限を mu*法線撃力 で物理的に制限する（当たる角度によって効き方が変わる）。
+  // frictionAsGripFraction=true（ラケット）: frictionを「完全に食いつく(滑らない)場合の
+  //   撃力に対して何割を実際にかけるか」という直接の割合として扱う。当たる角度に関わらず
+  //   常に一定の影響を持たせたいラケットの「こする量」向け。
+  // spinForContact: 接触点の滑り速度(spinAtContact)の計算にだけ使う回転(省略時はball.spin
+  //   そのもの)。racketImpact()が、入射する横回転(spin.z)の効きだけをPHYS.SIDESPIN_CURVE_FACTOR
+  //   で弱めた回転を渡すのに使う。結果の回転(newSpin)は常に本物のball.spinを基準に加算する
+  //   ので、ボール自体が持つ回転の値には影響しない。
+  collide(ball, normal, surfaceVel, restitution, friction, frictionAsGripFraction = false, spinForContact = ball.spin) {
+    const r = PHYS.BALL_RADIUS;
+    const I = PHYS.BALL_INERTIA;
+
+    const contactOffset = Vec3.scale(normal, -r); // 球面上の接触点（中心からの相対位置）
+    const relVel = Vec3.sub(ball.vel, surfaceVel);
+    const spinAtContact = Vec3.cross(spinForContact, contactOffset);
+    const slipVel = Vec3.add(relVel, spinAtContact); // 接触点における面に対するボール表面の滑り速度
+
+    const vn = Vec3.dot(slipVel, normal);
+    if (vn >= 0) return { vel: ball.vel, spin: ball.spin }; // すでに離れつつある
+
+    const vnVec = Vec3.scale(normal, vn);
+    const vt = Vec3.sub(slipVel, vnVec);
+
+    // 法線方向：反発係数に基づく撃力
+    const jn = -(1 + restitution) * vn * PHYS.BALL_MASS;
+    const Jn = Vec3.scale(normal, jn);
+
+    // 接線方向：滑りをゼロにする（完全に食いつく）のに必要な撃力(jNeeded)を基準に、
+    // 実際にかける撃力(jUse)を決める＝ここで「こする量」の効果が回転に変わる
+    let Jt = { x: 0, y: 0, z: 0 };
+    const vtLen = Vec3.length(vt);
+    if (vtLen > 1e-9) {
+      const mEffT = PHYS.BALL_MASS / (1 + (PHYS.BALL_MASS * r * r) / I);
+      const jNeeded = mEffT * vtLen;
+      const jUse = frictionAsGripFraction
+        ? Math.min(jNeeded, friction * jNeeded) // 割合指定：当たる角度に関係なく常に効く
+        : Math.min(jNeeded, friction * jn);     // クーロン摩擦：角度によって効き方が変わる
+      Jt = Vec3.scale(Vec3.normalize(vt), -jUse);
+    }
+
+    const totalJ = Vec3.add(Jn, Jt);
+    let newVel = Vec3.add(ball.vel, Vec3.scale(totalJ, 1 / PHYS.BALL_MASS));
+
+    // 回転への影響は接線方向の撃力のみ（法線方向の撃力は接触点ベクトルと平行なのでトルクを生まない）
+    const torqueImpulse = Vec3.cross(contactOffset, Jt);
+    let newSpin = Vec3.add(ball.spin, Vec3.scale(torqueImpulse, 1 / I));
+
+    // 安全弁：スライダーを極端な組み合わせにしても、トップ選手の実測値をはるかに超える
+    // 非現実的な速度・回転にはならないよう上限でクランプする（通常の設定範囲では効かない）
+    const speed = Vec3.length(newVel);
+    if (speed > PHYS.MAX_BALL_SPEED) {
+      newVel = Vec3.scale(newVel, PHYS.MAX_BALL_SPEED / speed);
+    }
+    const spinRate = Vec3.length(newSpin);
+    if (spinRate > PHYS.MAX_SPIN) {
+      newSpin = Vec3.scale(newSpin, PHYS.MAX_SPIN / spinRate);
+    }
+
+    return { vel: newVel, spin: newSpin };
+  },
+
+  // ---- ラケットでボールを打つ（サーブ・レシーブ共通） ----
+  racketImpact(ball, racket) {
+    const normal = racketNormal(racket);
+    const surfaceVel = racketSwingVelocity(racket);
+    const friction = racketFriction(racket);
+
+    // ギア効果：接線方向の摩擦インパルス(Jt)は法線(反発)方向とは数学的に直交するため、
+    // 単純な剛体衝突モデルのままだと「入射回転→反発方向の勢い(≒前後の飛距離)」には
+    // 一切影響しない（角度・上下の飛び方にしか出ない）。しかし実際のラバー+スポンジは
+    // 点接触ではなく、接触中にボールがめり込んで転がる「ギア」のようにかみ合うため、
+    // 上回転で当たった球は反発が強まって（＝ブロックが伸びる）、下回転で当たった球は
+    // 反発が弱まる（＝威力が死ぬ）という体感的な現象が起きる。ここではそれを、入射回転に
+    // 応じて実効反発係数を上下させる形で簡易的に再現する。
+    const dir = Math.sign(ball.vel.y) || racket.forwardSign;
+    const incomingTopBack = -dir * ball.spin.x; // decomposeSpinと同じ符号規則（正=上回転, 負=下回転）
+    const GEAR_EFFECT = 0.35;   // 反発係数に対する最大上乗せ/目減りの割合
+    const GEAR_SPIN_SCALE = 300; // この回転量(rad/s)でギア効果が最大(±GEAR_EFFECT)に達する
+    const gearBoost = clamp(incomingTopBack / GEAR_SPIN_SCALE, -1, 1) * GEAR_EFFECT;
+    const effectiveRestitution = clamp(PHYS.RACKET_RESTITUTION * (1 + gearBoost), 0.3, 1.15);
+
+    // 接触点の滑り速度(spinAtContact)にも、入射する横回転(spin.z)の分だけ
+    // PHYS.SIDESPIN_CURVE_FACTORを効かせる。ラケット面は台と違って傾いているため、
+    // このcollide()内部の物理計算だけでも入射サイドスピンが結果の勢い・回転へ
+    // はっきり効いてしまい(台バウンドと違って幾何学的にゼロにならない)、下の
+    // 「横方向のギア効果」の上乗せ分だけ弱めても「返球で受けた時の効き」自体は
+    // ほとんど変わらなかった。上回転・下回転(spin.x)側のギア効果はそのまま。
+    //
+    // 下回転で受けた球は、返球後も下回転が残りやすいようにしたい、との指摘を受けて、
+    // 入射が下回転(incomingTopBack<0)の時だけ、接触点の滑り速度計算に使うspin.xの
+    // 「効き目」をBACKSPIN_CONTACT_GAIN倍する。ボールの回転自体(ball.spin.x)は
+    // このcollide()呼び出しの間だけ、通常より強い回転として扱われる(結果のnewSpinは
+    // 実際のball.spinを基準に加算されるので、ボールの回転値自体は書き換わらない)。
+    // こうしないと、ラケット自身のスイング角度(④、レシーブ側は常に+30°のバイアス込み)
+    // から生まれるトルクの方が入射回転よりずっと強く、フラットに当てただけで
+    // 下回転が上回転へ丸ごと上書きされてしまっていた(実際の卓球でも、ボール自身の
+    // 回転が強いほど「食いついて」その場で完全に打ち消すのが難しい感覚に近い)。
+    // 上回転側(incomingTopBack>=0)は影響しない(下回転だけ残りやすくしたい、との指摘のため)。
+    // dir/incomingTopBackは上のギア効果の計算で既に求めてあるものをそのまま使う。
+    const BACKSPIN_CONTACT_GAIN = 2.5;
+    const xContactGain = incomingTopBack < 0 ? BACKSPIN_CONTACT_GAIN : 1;
+    const spinForContact = { x: ball.spin.x * xContactGain, y: ball.spin.y, z: ball.spin.z * PHYS.SIDESPIN_CURVE_FACTOR };
+    const result = this.collide(ball, normal, surfaceVel, effectiveRestitution, friction, true, spinForContact);
+
+    // 横方向のギア効果：上と同じ理屈が、左右方向（サイドスピン）にも本来はたらくはず。
+    // ただし台でのバウンドは、面の法線（鉛直軸）まわりの回転＝サイドスピンには数学的に
+    // 一切トルクを与えられない（点接触の摩擦は、接点の位置ベクトルと同じ軸まわりの回転を
+    // 変化させられないため）ため、上回転・下回転のように台バウンドで増幅されることがなく、
+    // 飛行中の空気抵抗でじわじわ減衰するだけになる。結果、同じ強さで発生させても、サーブが
+    // レシーバーに届く頃にはサイドスピンだけ上下回転よりずっと弱くなってしまい、フラットな
+    // 面で当てても「左右どちらの回転でもほぼ同じ方向に飛ぶ」ように感じられてしまっていた。
+    // ここでは、入射回転のうち面を左右にこする成分を直接取り出し、接線方向の追加キックとして
+    // 上乗せすることで、実際の卓球同様「サイドスピンサーブをフラットに当てると横に大きく
+    // 逸れる」という感覚を出す。
+    // ここでもPHYS.SIDESPIN_CURVE_FACTORで横回転由来のキックだけを弱める(入射回転の
+    // 数値自体・上回転側のgearBoostには手を付けない)。
+    const r = PHYS.BALL_RADIUS;
+    const contactOffset = Vec3.scale(normal, -r);
+    const spinZContact = Vec3.cross({ x: 0, y: 0, z: ball.spin.z * PHYS.SIDESPIN_CURVE_FACTOR }, contactOffset);
+    const spinZTangential = Vec3.sub(spinZContact, Vec3.scale(normal, Vec3.dot(spinZContact, normal)));
+    const SIDE_GEAR_EFFECT = -4;  // 入射サイドスピン由来の接線速度に対する上乗せ倍率（符号は実際の卓球理論に合わせて反転）
+    // 上限(m/s)側もPHYS.SIDESPIN_CURVE_FACTORで一緒に絞る。強い横回転では素の上乗せが
+    // 上限に張り付く(飽和する)ため、上限自体を下げないと入射側のスケールだけ弱めても
+    // 結果がほぼ変わらない(=返球で受けた時の効きが軽減されない)。
+    const SIDE_GEAR_KICK_MAX = 3.5 * PHYS.SIDESPIN_CURVE_FACTOR; // m/s 上限（極端な回転でも非現実的な弾かれ方にならない安全弁）
+    let gearKick = Vec3.scale(spinZTangential, SIDE_GEAR_EFFECT);
+    const gearKickLen = Vec3.length(gearKick);
+    if (gearKickLen > SIDE_GEAR_KICK_MAX) {
+      gearKick = Vec3.scale(gearKick, SIDE_GEAR_KICK_MAX / gearKickLen);
+    }
+    result.vel = Vec3.add(result.vel, gearKick);
+
+    // 安全弁：ギア効果の上乗せ後も速度上限は超えないようにする
+    const finalSpeed = Vec3.length(result.vel);
+    if (finalSpeed > PHYS.MAX_BALL_SPEED) {
+      result.vel = Vec3.scale(result.vel, PHYS.MAX_BALL_SPEED / finalSpeed);
+    }
+
+    ball.vel = result.vel;
+    ball.spin = result.spin;
+
+    // ラケット面から確実に離すため、法線方向にごくわずか押し出す
+    ball.pos = Vec3.add(ball.pos, Vec3.scale(normal, PHYS.BALL_RADIUS * 1.5));
+  },
+
+  // ---- 台面でのバウンド ----
+  tableBounce(ball) {
+    const normal = { x: 0, y: 0, z: 1 };
+    const result = this.collide(ball, normal, { x: 0, y: 0, z: 0 }, PHYS.TABLE_RESTITUTION, PHYS.TABLE_FRICTION);
+
+    // 横方向のギア効果：racketImpact()と同じ理屈だが、台バウンドは点接触の摩擦だけでは
+    // サイドスピン(spin.z)に一切トルクも横方向の力も与えられない（台の法線が完全にZ軸で、
+    // 接点が球のZ軸の真上/真下＝サイドスピンの回転軸そのものの上にあるため、スピンによる
+    // 接点の滑り速度が幾何学的に必ずゼロになる。cross(spin, contactOffset)がゼロになる
+    // ことからも分かる）。実際のボール表面とラバー/台のマット面は完全な点接触ではなく
+    // 多少めり込んでかみ合うため、現実のサイドスピンボールはバウンドでも幾分か横に逸れる。
+    // レシーブ側の⑤横スイングを強めても相手コートへのバウンド後は回転の影響が弱く感じる、
+    // という指摘を受け、飛行中のマグヌス効果と同じcross(spin, 速度)の関係を、バウンドの
+    // 瞬間の水平方向の追加キックとして再現する（法線方向にはトルクを与えられないという
+    // 事実そのものは変えず、あくまで見た目・体感のための上乗せ）。
+    // ここもPHYS.SIDESPIN_CURVE_FACTORで横回転由来のキックだけを弱める。
+    const horizVel = { x: ball.vel.x, y: ball.vel.y, z: 0 };
+    const sideKickDir = Vec3.cross({ x: 0, y: 0, z: ball.spin.z * PHYS.SIDESPIN_CURVE_FACTOR }, horizVel);
+    const TABLE_SIDE_GEAR_GAIN = 0.01; // 回転量×水平速度に対するキックの強さ
+    // 上限側もracketImpact()と同じ理由でPHYS.SIDESPIN_CURVE_FACTOR分だけ一緒に絞る
+    // (絞らないと、強い横回転では上限に張り付いたまま=効きが弱まって見えない)。
+    const TABLE_SIDE_GEAR_KICK_MAX = 4.5 * PHYS.SIDESPIN_CURVE_FACTOR; // m/s 上限（極端な回転でも非現実的な弾かれ方にならない安全弁）
+    let gearKick = Vec3.scale(sideKickDir, TABLE_SIDE_GEAR_GAIN);
+    const gearKickLen = Vec3.length(gearKick);
+    if (gearKickLen > TABLE_SIDE_GEAR_KICK_MAX) {
+      gearKick = Vec3.scale(gearKick, TABLE_SIDE_GEAR_KICK_MAX / gearKickLen);
+    }
+    result.vel = Vec3.add(result.vel, gearKick);
+
+    ball.vel = result.vel;
+    ball.spin = result.spin;
+    ball.pos.z = PHYS.BALL_RADIUS;
+    ball.bounceCount++;
+  },
+
+  // ---- ネットとの接触判定（前フレームと今フレームでネットの奥行き位置をまたいだか）----
+  crossesNet(prevY, currY) {
+    return (prevY - PHYS.NET_Y) * (currY - PHYS.NET_Y) < 0;
+  }
+};
+</script>
+<script>
+// ============================================================
+// UI: 入力値の取得と、状態表示（回転・バウンド位置・判定）の更新
+// ============================================================
+
+function getVal(id, defaultVal) {
+  const el = document.getElementById(id);
+  return el ? Number(el.value) : defaultVal;
+}
+
+// ============================================================
+// 球ごとの設定データ（1球目=サーブ, 2球目=レシーブ, 3球目以降...）
+// 画面上は球ごとに別々の入力欄を増やすのではなく、サーブ側・レシーブ側それぞれ
+// 1組の入力欄を使い回し、<select>で「今どの球を編集しているか」を切り替える
+// （球数が増えてもパネルの高さが伸びないようにするため）。実際の値はここに保持し、
+// 選択中の球の値だけをその都度、共通の入力欄に表示・反映する。
+// ============================================================
+
+function shotSide(n) {
+  return n % 2 === 1 ? "server" : "receiver";
+}
+
+// サーブ側・レシーブ側それぞれの既定値。全パラメータをここで別々に設定できる
+// （旧来は奥行き・スイング速度の2つだけがsideで分岐していたが、それ以外の
+// 項目もサーブ側/レシーブ側で個別に調整したい場合に備えて分離してある）。
+// ここでのswingSpeedは「1球目/2球目(サーブ・レシーブそれぞれの最初の球)」用の値。
+// 3球目以降(ラリー中の打ち合い)は下のDEFAULT_RALLY_SWING_SPEEDで別途上書きする。
+const DEFAULT_SERVER_SHOT = {
+  posX: 0,
+  depth: -10,
+  height: 10,
+  // 打点のタイミングを遅らせる時間(ms)
+  delayMs: 100,
+  angle: 0,
+  tiltX: 95,
+  rollAngle: 0,
+  swingDir: 0,
+  swingY: 0,
+  swingSpeed: 2.5,
+  backhand: false
+};
+const DEFAULT_RECEIVER_SHOT = {
+  posX: 0,
+  depth: -10,
+  height: 10,
+  delayMs: 100,
+  angle: 0,
+  tiltX: 95,
+  rollAngle: 0,
+  swingDir: 0,
+  swingY: 0,
+  swingSpeed: 1.0,
+  backhand: true
+};
+// 3球目以降(サーブ側・レシーブ側どちらも)のラリー中の既定スイング速度。
+// 1球目(サーブ)・2球目(レシーブ)より控えめな値にしている。
+const DEFAULT_RALLY_SWING_SPEED = 1;
+
+// n球目の既定値。サーブ側/レシーブ側それぞれの既定値(DEFAULT_SERVER_SHOT/
+// DEFAULT_RECEIVER_SHOT)をコピーして返す(直接参照を返すとshotData側で書き換えた時に
+// 既定値そのものが変わってしまうため、必ず新しいオブジェクトにする)。
+function defaultShotData(n) {
+  const side = shotSide(n);
+  const base = side === "server" ? DEFAULT_SERVER_SHOT : DEFAULT_RECEIVER_SHOT;
+  const data = { ...base };
+  if (n >= 3) data.swingSpeed = DEFAULT_RALLY_SWING_SPEED;
+  return data;
+}
+
+let totalShots = 2; // 常に2以上。1=サーブ, 2=レシーブは固定で削除できない
+const MAX_SHOTS = 21; // 安全のための上限（無限に増やせないようにする）
+let shotData = { 1: defaultShotData(1), 2: defaultShotData(2) };
+let currentShotNumber = { server: 1, receiver: 2 }; // 各パネルの<select>が今指している球番号
+
+// n球目の設定値をまとめて取得する（cm→m変換・奥行きの符号変換込み）。1球目(サーブ)は
+// 自陣端(y=0)からの距離をそのままmに、2球目以降(レシーブ側)はTABLE_LENGTHから引いて
+// 実座標に変換する（サーブ側とレシーブ側では自陣の向きが逆のため）。
+function getShotSettings(n) {
+  const s = shotData[n] || defaultShotData(n);
+  const side = shotSide(n);
+  return {
+    angle: s.angle,
+    tiltX: s.tiltX,
+    rollAngle: s.rollAngle,
+    swingDir: s.swingDir,
+    swingY: s.swingY,
+    swingSpeed: s.swingSpeed,
+    backhand: s.backhand,
+    posX: s.posX / 100,       // cm → m
+    depth: side === "server" ? s.depth / 100 : PHYS.TABLE_LENGTH - s.depth / 100, // cm → m
+    height: s.height / 100,   // cm → m
+    delaySec: (s.delayMs || 0) / 1000 // ms → s
+  };
+}
+
+// 1球目(サーブ)・2球目(レシーブ)はgetShotSettings()の薄いラッパーとして残す
+// （呼び出し側の名前を変えずに済ませるため）。lengthは球によらずサイド共通の値なので
+// shotDataには含めず、ここで合流させる。
+function getServeSettings() {
+  return { ...getShotSettings(1), length: getVal("length", 50) };
+}
+
+function getReturnSettings() {
+  return getShotSettings(2);
+}
+
+function applySettingsToRacket(racket, settings) {
+  racket.angle = settings.angle;
+  racket.tiltX = settings.tiltX;
+  racket.rollAngle = settings.rollAngle;
+  racket.swingDir = settings.swingDir;
+  racket.swingY = settings.swingY;
+  racket.swingSpeed = settings.swingSpeed;
+  // 「打点を遅らせる時間」もracketに乗せておく。triggerSwing()が打った瞬間の値を
+  // スナップショットし(delaySecAtHit)、スイングモーションの大きさに反映する
+  // (computeDelaySwingScale参照)。
+  racket.delaySec = settings.delaySec;
+}
+
+function updateSpinText(ball) {
+  const s = decomposeSpin(ball);
+  let text = "無回転";
+
+  if (Math.abs(s.topBack) > 0.3) {
+    text = (s.topBack > 0 ? "上回転 " : "下回転 ") + Math.abs(s.topBack).toFixed(1) + "回転/秒";
+  }
+  if (Math.abs(s.side) > 0.3) {
+    const sideText = "横回転 " + Math.abs(s.side).toFixed(1) + "回転/秒 (" + (s.side > 0 ? "右" : "左") + "方向)";
+    text = (text === "無回転") ? sideText : text + " / " + sideText;
+  }
+
+  const spinEl = document.getElementById("currentSpin");
+  if (spinEl) spinEl.textContent = text;
+}
+
+function setStatus(text) {
+  const statusEl = document.getElementById("status");
+  if (statusEl) statusEl.textContent = text;
+}
+
+// バウンド地点を「どちらのコートか」「中央からの左右」「ネットからの奥行き」で説明する
+function describeBounce(x, y) {
+  const side = y < PHYS.NET_Y ? "サーバー側コート" : "レシーバー側コート";
+  const lr = Math.abs(x) < 0.1 ? "中央付近" : (x > 0 ? `右へ${Math.round(Math.abs(x) * 100)}cm` : `左へ${Math.round(Math.abs(x) * 100)}cm`);
+  const netDist = Math.round(Math.abs(y - PHYS.NET_Y) * 100);
+  return `${side} / ${lr} / ネットから${netDist}cm`;
+}
+
+function setShotInfo(text) {
+  const el = document.getElementById("shotInfo");
+  if (el) el.textContent = text;
+}
+</script>
+<script>
+// ============================================================
+// Canvas (レシーバー目線・背面視点レンダリング)
+// 物理演算はすべてメートル単位(PHYS)で行い、画面表示の直前にだけ
+// worldToPixel() でピクセル座標に変換する。
+// ============================================================
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let animFrameCount = 0;
+let lastTimestamp = null;
+let physicsAccumulator = 0;
+
+const BALL_RADIUS_PX = 9; // 見やすさのための表示上の半径（物理計算とは独立）
+
+// ラケット(手)を、computeRacketGeometry()内で奥行き方向(net側)へ前に出して描く量(m)。
+// 「ラケットが体より前にある」という見た目の演出用オフセットで、racket.pos自体(＝
+// ヒット判定や弾道計算に使う実際の位置)には含まれない。drawTrail()が弾道の描画開始点を
+// このオフセット分だけ前に合わせる際にも同じ値を使うため、値のズレが起きないよう
+// ここで一箇所にまとめて定義し、両方から参照する。
+const RACKET_VISUAL_FORWARD_OFFSET_M = 0.0;
+
+const ball = createBall();
+const serverRacket = createRacket("server");
+const receiverRacket = createRacket("receiver");
+
+let landingMarker = null; // { x, y } 直近のバウンド地点（ワールド座標）
+let centerPanDragging = false; // 台の中心の表示位置ハンドルをドラッグでつかんでいる間true
+
+
+// ============================================================
+// カメラ(本物の3D透視投影) → 画面投影
+// ============================================================
+// 台の中心付近を注視点として、その周りをCAMERA_YAW(度)で水平に周回する、
+// 位置・向き・画角を持つ本物の3Dカメラで透視投影する。すべての描画物
+// (台・ネット・ボール・選手の腕や胴体)はワールド座標(m)のままこのproject()
+// (またはworldToPixel()経由)に渡されるため、ここ1箇所を回すだけでシーン全体が
+// 連動して回転する。
+//
+// 以前はここが「奥行きに応じて拡大率を線形に変える」疑似遠近法で、その式ごと
+// 画面上のx,yを回転させる実装だった。疑似遠近法にはワールド空間の直線を画面上でも
+// 直線に保つ性質が無いため、カメラ角度を回すと台の辺やネットの土台が本来ズレて
+// はいけない場所でズレたりカーブしたりする不自然な見た目になっていた。本物の
+// 透視投影(カメラ空間へ変換してから遠近除算する)は数学的にワールド空間の直線を
+// 必ず画面上でも直線に保つため、この問題自体が起こらなくなる。
+// カメラを注視点から離し、その分だけ画角(CAMERA_FOV_FOCAL_PX)を狭めて(望遠寄りに
+// して)同じ大きさに見えるようにすると、近い物と遠い物の大きさの差(遠近感)が
+// 穏やかになる(望遠レンズで撮ると遠近感が「圧縮されて」見えるのと同じ理屈)。
+// 台がカメラのすぐそばにあるくらい近いと、カメラ角度を180°回した時にレシーブ側と
+// サーブ側で選手の大きさが極端に違って見えてしまうため、この2つをセットで
+// 大きくして遠近感を穏やかにしている。
+const CAMERA_LOOK_AT = { x: 0, y: PHYS.NET_Y, z: 0.1 }; // 注視点(台の中心、台の上面付近)
+const CAMERA_ORBIT_RADIUS = 6.26; // 注視点からカメラまでの水平距離(m)
+const CAMERA_ORBIT_HEIGHT = 4.24; // 注視点からカメラまでの高さ(m)
+// 「表示倍率」1.5倍にした時の見た目を新たな基準(表示倍率1.0)にするため、
+// 元の値(1327)に1.5を掛けている。表示倍率スライダー自体の可動域(0.6〜1.6)は
+// そのまま、この新しい基準に対する相対倍率として働く。
+const CAMERA_FOV_FOCAL_PX = 1327 * 1.5; // 画面上の位置計算に使う画角相当の焦点距離(px)。大きいほど望遠でズームして見える
+// ボール・選手・ラケットなど各部品の大きさ(scale)算出用の基準値。
+// CAMERA_FOV_FOCAL_PX(位置計算の画角)から連動して求めることで、台の見た目の
+// 大きさが変わっても「台に対する人物・ラケットの大きさの比率」が常に一定に保たれる
+// ようにしている(独立した固定値にしていたところ、台だけ小さくなって人物が
+// 相対的に大きく見えてしまう不具合があったため)。
+//
+// 旧・疑似遠近法では、台の幅(px)=table.width(500)*1.3=650に対してラケットの
+// 半径(px)=R_OUTER(27)という比率(27/650)が、奥行きによらず常に一定だった
+// (どちらも同じ「scale」に比例していたため)。ここでも同じ比率になるよう、
+// 台の幅(m)とCAMERA_FOV_FOCAL_PXから逆算する。
+const CAMERA_SIZE_FOCAL = CAMERA_FOV_FOCAL_PX * PHYS.TABLE_WIDTH / 650;
+
+// カメラの位置と、そこから見た「前方・右・上」の3本の単位ベクトルを、現在の
+// CAMERA_YAWから求める。呼び出しのたびに計算するが、内容はベクトル演算数回程度
+// なので、1フレームでproject()を何度呼んでも重くならない。
+function getCameraBasis() {
+  const yawRad = deg2rad(CAMERA_YAW);
+  const camPos = {
+    x: CAMERA_LOOK_AT.x + CAMERA_ORBIT_RADIUS * Math.sin(yawRad),
+    y: CAMERA_LOOK_AT.y + CAMERA_ORBIT_RADIUS * Math.cos(yawRad),
+    z: CAMERA_LOOK_AT.z + CAMERA_ORBIT_HEIGHT
+  };
+  const forward = Vec3.normalize(Vec3.sub(CAMERA_LOOK_AT, camPos));
+  const worldUp = { x: 0, y: 0, z: 1 };
+  // right = worldUpとforwardの外積(この順序で「ワールドのx+方向 = 画面の右方向」に
+  // なる。逆順だと左右反転してしまう)。up はrightとforwardから作り直すことで、
+  // 常にforwardと直交する単位ベクトルになる。
+  const right = Vec3.normalize(Vec3.cross(worldUp, forward));
+  const up = Vec3.normalize(Vec3.cross(forward, right));
+  return { camPos, forward, right, up };
+}
+
+// ワールド座標(m)を画面ピクセル座標へ変換する。x=横(左右)・y=奥行き(サーブ側0〜
+// レシーブ側PHYS.TABLE_LENGTH)・z=高さ(台の上面が0)。worldToPixel()もこの関数を
+// そのまま使う(第二引数以降の単位がどちらもメートルになったため、単純な別名になった)。
+function project(xm, ym, zm = 0) {
+  const { camPos, forward, right, up } = getCameraBasis();
+  const rel = { x: xm - camPos.x, y: ym - camPos.y, z: zm - camPos.z };
+  const camX = Vec3.dot(rel, right);
+  const camY = Vec3.dot(rel, up);
+  const camZ = Vec3.dot(rel, forward);
+  // カメラの真横・後ろ側などcamZが0に近い/負になるケース(通常の操作では起こらないが、
+  // 極端な表示位置ドラッグなどへの安全弁)で除算が破綻しないよう下限を設ける。
+  const safeZ = Math.max(camZ, 0.15);
+
+  const screenCenterX = canvas.width / 2;
+  const screenCenterY = canvas.height / 2 - 40; // canvas中心よりやや上に基準を置く
+  const perspectiveX = screenCenterX + (camX / safeZ) * CAMERA_FOV_FOCAL_PX;
+  const perspectiveY = screenCenterY - (camY / safeZ) * CAMERA_FOV_FOCAL_PX;
+  const scale = CAMERA_SIZE_FOCAL / safeZ;
+
+  // 「表示倍率」(VIEW_ZOOM)は、画面中央(canvas.width/2, canvas.height/2)を基準に
+  // 位置・大きさ(scale)をまとめて拡大/縮小する。台のあらゆる部品(台・net・ボール・
+  // ラケット・腕・胴体シルエット)はすべてこのproject()経由で描画位置を求めているため、
+  // ここ1箇所を掛けるだけでシーン全体が連動して拡大/縮小される。HUDパネルなど
+  // canvas.width/heightを直接基準にした画面固定の要素はproject()を使っていないので
+  // 影響を受けない。
+  const zoomPivotX = canvas.width / 2;
+  const zoomPivotY = canvas.height / 2;
+  const zoomedX = zoomPivotX + (perspectiveX - zoomPivotX) * VIEW_ZOOM;
+  const zoomedY = zoomPivotY + (perspectiveY - zoomPivotY) * VIEW_ZOOM;
+
+  // PAN_X/PAN_Y(表示位置オフセット)は、ズーム後の画面px単位でそのまま平行移動させる
+  // だけ。台の中心のドラッグハンドルで動かした量が、ズーム倍率に関わらずそのまま
+  // マウスの移動量と一致するようにするため。
+  return { x: zoomedX + PAN_X, y: zoomedY + PAN_Y, scale: scale * VIEW_ZOOM };
+}
+
+// 台の中心(project()のPAN_X/PAN_Y・VIEW_ZOOM込みの現在の画面位置)を返す。
+// 表示位置ドラッグハンドルの描画位置・クリック判定の両方をこれで揃える。
+function centerHandleScreenPos() {
+  return project(0, PHYS.NET_Y, 0);
+}
+
+function worldToPixel(xm, ym, zm) {
+  return project(xm, ym, zm);
+}
+
+// 画面クリック座標 → ワールド座標（高さzmは固定として、カメラからそのスクリーン
+// 座標方向へ伸びるレイと、高さzmの水平面との交点を求める標準的なレイキャスティング）。
+// side: "server"なら自陣側、"receiver"なら相手陣側の範囲にドラッグを制限する
+function screenToWorld(mouseX, mouseY, zm, side) {
+  // project()側でPAN_X/PAN_Y(表示位置オフセット)を加算し、さらにVIEW_ZOOM(画面中央
+  // 基準の拡大/縮小)を掛けているので、ここでも同じ順序で逆変換してから、以下の
+  // 従来通り(pan=0, zoom=1前提)の計算に渡す。
+  mouseX -= PAN_X;
+  mouseY -= PAN_Y;
+  const zoomPivotX = canvas.width / 2;
+  const zoomPivotY = canvas.height / 2;
+  mouseX = zoomPivotX + (mouseX - zoomPivotX) / VIEW_ZOOM;
+  mouseY = zoomPivotY + (mouseY - zoomPivotY) / VIEW_ZOOM;
+
+  const { camPos, forward, right, up } = getCameraBasis();
+  const screenCenterX = canvas.width / 2;
+  const screenCenterY = canvas.height / 2 - 40; // project()と必ず同じ値を使う
+  const ndcX = (mouseX - screenCenterX) / CAMERA_FOV_FOCAL_PX;
+  const ndcY = (screenCenterY - mouseY) / CAMERA_FOV_FOCAL_PX;
+  const rayDir = {
+    x: right.x * ndcX + up.x * ndcY + forward.x,
+    y: right.y * ndcX + up.y * ndcY + forward.y,
+    z: right.z * ndcX + up.z * ndcY + forward.z
+  };
+
+  // レイが高さzmの水平面を通る位置(カメラからの距離s)を求める。rayDir.zがほぼ0
+  // (視線がほぼ真水平)のケースはゼロ除算を避けるため小さな値で下限を付ける。
+  const rayDirZ = Math.abs(rayDir.z) < 1e-6 ? (rayDir.z < 0 ? -1e-6 : 1e-6) : rayDir.z;
+  const s = (zm - camPos.z) / rayDirZ;
+  const worldXRaw = camPos.x + s * rayDir.x;
+  const worldYRaw = camPos.y + s * rayDir.y;
+
+  const xm = clamp(worldXRaw, -PHYS.TABLE_WIDTH / 2 - 0.3, PHYS.TABLE_WIDTH / 2 + 0.3);
+  // ドラッグで動かせる奥行きの範囲は、「奥行き位置(自陣端からの距離)」の数値入力欄
+  // (svShotDepth/rcShotDepth、min="-50" max="50")と同じ±0.5mにする(以前はここだけ
+  // 別の(数値入力欄より広い)範囲になっていて、ドラッグと数値入力で可動域が
+  // 一致していなかった)。
+  const DRAG_DEPTH_RANGE_M = 1.5;
+  const yRange = side === "server"
+    ? [-DRAG_DEPTH_RANGE_M, DRAG_DEPTH_RANGE_M]
+    : [PHYS.TABLE_LENGTH - DRAG_DEPTH_RANGE_M, PHYS.TABLE_LENGTH + DRAG_DEPTH_RANGE_M];
+  const ym = clamp(worldYRaw, yRange[0], yRange[1]);
+
+  return { x: xm, y: ym };
+}
+
+function setupBallToRacket() {
+  resetBallToRacket(ball, serverRacket);
+  landingMarker = null;
+  setShotInfo("");
+  // ラリーが終わって次のサーブに備えるタイミングで、フォロースルーの姿勢から構えに戻す
+  serverRacket.swingProgress = null;
+  receiverRacket.swingProgress = null;
+  // レシーブ側も、ラリー中に動いた位置のまま残さず、設定した構える位置(左右位置・
+  // 奥行き位置・高さ、面の向き)へ戻す（ページ読み込み時・表示リセット時どちらでも）。
+  syncReceiverRacketFromUI();
+}
+
+
+// ============================================================
+// 描画機能
+// ============================================================
+
+function drawBackground() {
+  const horizon = 150;
+
+  const wallGrad = ctx.createLinearGradient(0, 0, 0, horizon);
+  wallGrad.addColorStop(0, "#0b1220");
+  wallGrad.addColorStop(1, "#1c2b3a");
+  ctx.fillStyle = wallGrad;
+  ctx.fillRect(0, 0, canvas.width, horizon);
+
+  const floorGrad = ctx.createLinearGradient(0, horizon, 0, canvas.height);
+  floorGrad.addColorStop(0, "#1a2e22");
+  floorGrad.addColorStop(1, "#0c1712");
+  ctx.fillStyle = floorGrad;
+  ctx.fillRect(0, horizon, canvas.width, canvas.height - horizon);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.lineWidth = 1;
+  for (let i = -4; i <= 4; i++) {
+    const topX = canvas.width / 2 + i * 40;
+    const botX = canvas.width / 2 + i * 220;
+    ctx.beginPath();
+    ctx.moveTo(topX, horizon);
+    ctx.lineTo(botX, canvas.height);
+    ctx.stroke();
+  }
+}
+
+// 台の高さ(床面から台の上面まで。実際の規格(76cm)に近い値)。脚を本物の3D線分
+// として描くために使う。
+const TABLE_HEIGHT_FROM_FLOOR = 0.76;
+
+function drawTable() {
+  const halfW = PHYS.TABLE_WIDTH / 2;
+  const pTL = project(-halfW, 0, 0);
+  const pTR = project(halfW, 0, 0);
+  const pBL = project(-halfW, PHYS.TABLE_LENGTH, 0);
+  const pBR = project(halfW, PHYS.TABLE_LENGTH, 0);
+
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath();
+  // カメラ角度(CAMERA_YAW)によっては、pBL/pBRの左右が画面上で入れ替わり
+  // (pBR.x - pBL.x)が負になることがあるため、半径はMath.absで絶対値を取る
+  // (符号のままだとellipse()が負の半径でエラーになる)。
+  ctx.ellipse((pBL.x + pBR.x) / 2, pBR.y + 178, Math.abs(pBR.x - pBL.x) / 2 + 20, 22, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 脚は台の4隅から本物の高さ(TABLE_HEIGHT_FROM_FLOOR)分だけ下(床面)へ伸ばした
+  // 3D線分として描く。以前は「画面上でまっすぐ下へ固定ピクセル分」という2D的な
+  // 描き方だったため、本物のカメラ視点でも常に正しい向きに脚が伸びるようにするため
+  // 変更した。
+  ctx.strokeStyle = "#20282e";
+  ctx.lineWidth = 12;
+  ctx.lineCap = "round";
+  [
+    { x: -halfW, y: 0 },
+    { x: halfW, y: 0 },
+    { x: -halfW, y: PHYS.TABLE_LENGTH },
+    { x: halfW, y: PHYS.TABLE_LENGTH }
+  ].forEach(corner => {
+    const top = project(corner.x, corner.y, 0);
+    const bottom = project(corner.x, corner.y, -TABLE_HEIGHT_FROM_FLOOR);
+    ctx.beginPath();
+    ctx.moveTo(top.x, top.y);
+    ctx.lineTo(bottom.x, bottom.y);
+    ctx.stroke();
+  });
+
+  // 台の塗り・白枠。本物の透視投影なので、4隅を直線で結ぶだけでワールド空間の
+  // まっすぐな辺がそのまま画面上でもまっすぐになる。
+  const tableGrad = ctx.createLinearGradient(pTL.x, pTL.y, pBL.x, pBL.y);
+  tableGrad.addColorStop(0, "#0a5c8f");
+  tableGrad.addColorStop(1, "#0e7fc2");
+  ctx.fillStyle = tableGrad;
+  ctx.beginPath();
+  ctx.moveTo(pTL.x, pTL.y);
+  ctx.lineTo(pTR.x, pTR.y);
+  ctx.lineTo(pBR.x, pBR.y);
+  ctx.lineTo(pBL.x, pBL.y);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  const pNetL = project(-halfW, PHYS.NET_Y, 0);
+  const pNetR = project(halfW, PHYS.NET_Y, 0);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.7)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(pNetL.x, pNetL.y);
+  ctx.lineTo(pNetR.x, pNetR.y);
+  ctx.stroke();
+
+  const pNetTopL = project(-halfW, PHYS.NET_Y, PHYS.NET_HEIGHT);
+  const pNetTopR = project(halfW, PHYS.NET_Y, PHYS.NET_HEIGHT);
+
+  ctx.fillStyle = "rgba(220, 220, 220, 0.4)";
+  ctx.beginPath();
+  ctx.moveTo(pNetL.x, pNetL.y);
+  ctx.lineTo(pNetR.x, pNetR.y);
+  ctx.lineTo(pNetTopR.x, pNetTopR.y);
+  ctx.lineTo(pNetTopL.x, pNetTopL.y);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(pNetTopL.x, pNetTopL.y);
+  ctx.lineTo(pNetTopR.x, pNetTopR.y);
+  ctx.stroke();
+
+  const pCenterTop = project(0, 0, 0);
+  const pCenterBottom = project(0, PHYS.TABLE_LENGTH, 0);
+  ctx.strokeStyle = "rgba(255,255,255,0.85)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(pCenterTop.x, pCenterTop.y);
+  ctx.lineTo(pCenterBottom.x, pCenterBottom.y);
+  ctx.stroke();
+
+  ctx.strokeStyle = "#cbd5e1";
+  ctx.lineWidth = 3;
+  [pNetL, pNetR].forEach((p, idx) => {
+    const top = idx === 0 ? pNetTopL : pNetTopR;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(top.x, top.y - 4);
+    ctx.stroke();
+  });
+
+  if (landingMarker) {
+    const lm = worldToPixel(landingMarker.x, landingMarker.y, 0);
+    ctx.strokeStyle = "#ffd84d";
+    ctx.lineWidth = 2.5 * lm.scale;
+    const s = 8 * lm.scale;
+    ctx.beginPath();
+    ctx.moveTo(lm.x - s, lm.y - s); ctx.lineTo(lm.x + s, lm.y + s);
+    ctx.moveTo(lm.x + s, lm.y - s); ctx.lineTo(lm.x - s, lm.y + s);
+    ctx.stroke();
+  }
+}
+
+// 台の中心にある、表示位置(PAN_X/PAN_Y)をドラッグで動かすためのハンドル。
+// クリックしてつかむ(centerPanDragging=trueにする)と、以後マウスを動かすたびに
+// PAN_X/PAN_Yが更新され、canvas上の全ての描画位置(project()経由)がまとめて
+// 前後左右に平行移動する。ワールド座標・物理演算には一切影響しない、見た目上の
+// 視点移動専用の操作。
+function drawCenterPanHandle() {
+  const p = centerHandleScreenPos();
+  const r = 14;
+  const active = centerPanDragging;
+
+  ctx.save();
+  ctx.globalAlpha = active ? 0.95 : 0.55;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  ctx.fillStyle = active ? "rgba(255, 196, 0, 0.35)" : "rgba(255, 255, 255, 0.18)";
+  ctx.fill();
+  ctx.strokeStyle = active ? "#ffc400" : "#ffffff";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // 十字(前後左右に動かせることを示すガイド)
+  ctx.beginPath();
+  ctx.moveTo(p.x - r + 4, p.y); ctx.lineTo(p.x + r - 4, p.y);
+  ctx.moveTo(p.x, p.y - r + 4); ctx.lineTo(p.x, p.y + r - 4);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ============================================================
+// 画面固定のミニ方向表示（HUD）
+// ラケットの位置とは連動させず、サーブ側は常に画面左上、レシーブ側は常に画面右上に
+// 固定パネルを置き、それぞれ「面の向き」「進行方向」の2本を一緒に表示する。
+// ============================================================
+
+// 中心からのオフセット点(px, py)ひとつを、基準軸(横・縦)付きの小さなコンパスとして描く。
+// 中心(0,0)なら矢印なし＝点として見える。px/pyは呼び出し側で「基準からの変化量」を
+// そのまま直線的な座標として渡す。
+// scale: 全画面表示時にパネルごと大きく描くための倍率(通常時は1)。半径r・矢印の
+// 到達点px/pyは呼び出し元(drawHudPanel)で既にscale込みの値になっているので、
+// ここでは「rに対して固定pxで指定していた」線の太さ・矢じりの大きさ・文字サイズなど
+// だけにscaleを掛ければ、パネル全体が破綻なく相似形に拡大される。
+function drawHudGauge(cx, cy, r, px, py, colorMain, colorHi, label, scale = 1) {
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.lineWidth = 1 * scale;
+  ctx.stroke();
+
+  // 基準軸：横=左右、縦=上下
+  ctx.strokeStyle = "rgba(255,255,255,0.2)";
+  ctx.lineWidth = 1 * scale;
+  ctx.beginPath();
+  ctx.moveTo(-r, 0); ctx.lineTo(r, 0);
+  ctx.moveTo(0, -r); ctx.lineTo(0, r);
+  ctx.stroke();
+
+  // 矢印本体（二重線＋矢じりで簡易的に立体感を出す）。中心付近(ほぼ0,0)なら
+  // 矢印を描かず、点(中心の丸)だけにする。
+  const p = { x: px, y: py };
+  const pLen = Math.hypot(p.x, p.y);
+  if (pLen < 2 * scale) {
+    ctx.beginPath();
+    ctx.arc(0, 0, 3 * scale, 0, Math.PI * 2);
+    ctx.fillStyle = colorMain;
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = "#e2e8f0";
+    ctx.font = `${11 * scale}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(label, cx, cy + r + 14 * scale);
+    return;
+  }
+  const angle = Math.atan2(p.y, p.x);
+  const perpX = -Math.sin(angle), perpY = Math.cos(angle);
+
+  ctx.lineCap = "round";
+  ctx.strokeStyle = colorMain;
+  ctx.lineWidth = 3.5 * scale;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+
+  ctx.strokeStyle = colorHi;
+  ctx.lineWidth = 1.5 * scale;
+  ctx.beginPath();
+  ctx.moveTo(perpX, perpY);
+  ctx.lineTo(p.x + perpX, p.y + perpY);
+  ctx.stroke();
+
+  const headSize = 7 * scale;
+  const hx1 = p.x - headSize * Math.cos(angle - Math.PI / 7);
+  const hy1 = p.y - headSize * Math.sin(angle - Math.PI / 7);
+  const hx2 = p.x - headSize * Math.cos(angle + Math.PI / 7);
+  const hy2 = p.y - headSize * Math.sin(angle + Math.PI / 7);
+  ctx.fillStyle = colorMain;
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+  ctx.lineTo(hx1, hy1);
+  ctx.lineTo(hx2, hy2);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+
+  ctx.fillStyle = "#e2e8f0";
+  ctx.font = `${11 * scale}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText(label, cx, cy + r + 14 * scale);
+}
+
+// サーブ側/レシーブ側それぞれの「面の向き」「進行方向」パネル。
+// scale: 全画面表示時にパネルごと大きく描くための倍率(通常時は1)。x/y/w/hは
+// 呼び出し元(render())で既にscale込みの位置・大きさになっているので、ここでは
+// 「wやhに対して固定pxで指定していた」枠の角丸・文字サイズ・ゲージ半径などに
+// scaleを掛けることで、パネル全体が破綻なく相似形に拡大される。
+function drawHudPanel(x, y, w, h, title, racket, scale = 1) {
+  ctx.save();
+
+  ctx.fillStyle = "rgba(15,23,42,0.55)";
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = 1 * scale;
+  const rad = 8 * scale;
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rad);
+  ctx.arcTo(x + w, y + h, x, y + h, rad);
+  ctx.arcTo(x, y + h, x, y, rad);
+  ctx.arcTo(x, y, x + w, y, rad);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#f1f5f9";
+  ctx.font = `bold ${12 * scale}px sans-serif`;
+  ctx.textAlign = "left";
+  ctx.fillText(title, x + 10 * scale, y + 18 * scale);
+
+  const r = 24 * scale;
+  const cy = y + h / 2 + 10 * scale;
+
+  // worldToPixel()自体は左右反転していないが、①ヨー角は racketNormal() 内で
+  // forwardSign(サーブ側+1／レシーブ側-1)込みの法線ベクトルに掛けるため、
+  // 同じ①の値でもサーブ側とレシーブ側で法線のx成分の符号が逆になる。
+  // ①のゲージだけサーブ側の符号を反転して表示を揃える。
+  // ⑤横スイングはracketSwingVelocity()がforwardSignの影響を受けないため、
+  // サーブ側・レシーブ側で符号は元から揃っており、反転しない。
+  const isServer = (racket.side === "server");
+  const yawMirror = isServer ? -1 : 1;
+
+  // 面の向き：①ヨー角(左右)と②ピッチ角(上下)のズレを、基準姿勢(①②とも0/90°)からの
+  // 直線的な変化量としてゲージの座標に変換する。②だけを動かした場合、基準では中心の点、
+  // 開くと上へ・閉じると下へ動く（③ロールは②=90°付近では法線に影響しないため、
+  // このゲージには含めない）。
+  const yawFrac = clamp((racket.angle || 0) / 80, -1, 1) * yawMirror;
+  const pitchFrac = clamp(((racket.tiltX !== undefined ? racket.tiltX : 90) - 90) / 90, -1, 1);
+  drawHudGauge(x + w * 0.3, cy, r, yawFrac * r, pitchFrac * r, "#b5580a", "#ffce8a", "面の向き", scale);
+
+  // 進行方向：④縦スイング(上下)・⑤横スイング(左右)のズレも、面の向きと同じ考え方で
+  // 基準(④⑤とも0°)からの直線的な変化量としてゲージの座標に変換する。
+  // ④はプラスで上・マイナスで下なので、画面は下がプラスになる分だけ符号を反転する。
+  // ⑤はforwardSignの影響を受けないので、反転せずそのまま使う。
+  const swingYawFrac = clamp((racket.swingY || 0) / 80, -1, 1);
+  const swingPitchFrac = clamp(-(racket.swingDir || 0) / 90, -1, 1);
+  drawHudGauge(x + w * 0.7, cy, r, swingYawFrac * r, swingPitchFrac * r, "#0a6f80", "#8ef6ff", "スイング方向", scale);
+
+  ctx.restore();
+}
+
+// 今何球目かが一目で分かる、画面固定の小さなカウント表示。drawHudPanel()と
+// 同じ角丸パネルのスタイルに合わせる。ball.shotNumberは「直近に打たれたショットの
+// 番号」(0=まだ誰も打っていない)なので、0の時は「サーブ待機」、それ以外は
+// 「n球目 / 全m球」と表示する。
+// scale: drawHudPanel()と同じ全画面表示用の倍率(通常時は1)。x/y/w/hは呼び出し元で
+// 既にscale込みなので、ここでは固定pxの角丸・文字サイズにだけ掛ける。
+function drawShotCountBadge(x, y, w, h, scale = 1) {
+  ctx.save();
+
+  ctx.fillStyle = "rgba(15,23,42,0.55)";
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = 1 * scale;
+  const rad = 8 * scale;
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rad);
+  ctx.arcTo(x + w, y + h, x, y + h, rad);
+  ctx.arcTo(x, y + h, x, y, rad);
+  ctx.arcTo(x, y, x + w, y, rad);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  const label = ball.shotNumber > 0
+    ? `${ball.shotNumber}球目 `
+    : `全${totalShots}球`;
+  ctx.fillStyle = "#f1f5f9";
+  ctx.font = `bold ${24 * scale}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, x + w / 2, y + h / 2.5 + 3);
+
+  ctx.restore();
+}
+
+// 片足分の脚（太もも=ショーツ色、すね=肌色、膝関節、靴）を描く
+function drawLeg(hip, knee, foot, s, shoeTilt) {
+  ctx.strokeStyle = "#1e293b";
+  ctx.lineWidth = 11 * s;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(hip.x, hip.y);
+  ctx.lineTo(knee.x, knee.y);
+  ctx.stroke();
+
+  ctx.strokeStyle = "#e3b492";
+  ctx.lineWidth = 8 * s;
+  ctx.beginPath();
+  ctx.moveTo(knee.x, knee.y);
+  ctx.lineTo(foot.x, foot.y);
+  ctx.stroke();
+
+  ctx.fillStyle = "#1e293b";
+  ctx.beginPath();
+  ctx.arc(knee.x, knee.y, 5 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#f8fafc";
+  ctx.beginPath();
+  ctx.ellipse(foot.x, foot.y + 3 * s, 14 * s, 7 * s, shoeTilt, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#0f172a";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+// ワールド座標(m)上で、pivotを支点にpointをaxis("x"/"y"/"z")まわりにrad回転させた
+// 位置を返す（pivotからの距離を保ったまま角度だけ変えるので、腕の長さは崩れない）。
+// カメラ角度(CAMERA_YAW)を導入する前は、このpivot回転を画面ピクセル空間で行って
+// いたが、それだとカメラを回した時に腕の振り抜きの向きが破綻してしまう。ここでは
+// 常にワールド座標(m)のまま回転させ、最後にworldToPixel()で投影することで、
+// project()側のCAMERA_YAW回転と自動的に整合する(computeRacketGeometry()を参照)。
+// axisは世界のX軸(左右・④縦スイングの肘支点)/Y軸(奥行き・③ロールの肘支点)/
+// Z軸(鉛直・⑤横スイングの肩支点)のいずれか。Vec3.rotateX/Y/Zとそのまま対応する。
+function pivotAroundWorld(point, pivot, axis, rad) {
+  const rel = Vec3.sub(point, pivot);
+  const rotated = axis === "x" ? Vec3.rotateX(rel, rad)
+    : axis === "y" ? Vec3.rotateY(rel, rad)
+    : Vec3.rotateZ(rel, rad);
+  return Vec3.add(pivot, rotated);
+}
+
+// 「打点を遅らせる時間」(delaySecAtHit)を、スイングモーションの大きさに反映するための
+// 倍率。遅らせるほど実際にはボールが伸びて/落ちてから捉えることになり、実際の卓球でも
+// 余裕を持って大きく振れる(＝バックスイングや振れ幅が大きくなる)。逆に遅延が短いほど、
+// 早い(ライジング気味の)タイミングでコンパクトに当てるだけの動きになりやすい。
+// 既定値(DELAY_SWING_BASELINE_MS=100ms、DEFAULT_SERVER_SHOT/DEFAULT_RECEIVER_SHOTの
+// 既定delayMsと同じ)でちょうど1(=これまで通りの大きさ)になるように基準を取り、
+// 極端になりすぎないよう0.2〜1.5倍にクランプする。
+const DELAY_SWING_BASELINE_MS = 100;
+function computeDelaySwingScale(racket) {
+  const delayMs = (racket.delaySecAtHit || 0) * 1000;
+  return clamp(delayMs / DELAY_SWING_BASELINE_MS, 0.2, 1.5);
+}
+
+// racket本体の描画に必要な位置・角度をひとまとめに計算する。ボールとラケットの
+// 前後関係(painter's algorithm)を「補助円はボールの奥、ブレード・腕はボールの手前」
+// のように部品単位で分けて描画したいため、drawArmAndRacket()を
+// drawRacketBase()(補助円まで)とdrawRacketBladeAndArm()(ブレード以降)の2つに分割し、
+// 両者から同じ計算をこの関数経由で共有する。
+function computeRacketGeometry(racket) {
+
+  const isServer = (racket.side === "server");
+  const restHandPos = worldToPixel(racket.pos.x, racket.pos.y, racket.pos.z); // 振っていない時の基準位置(画面)
+
+  // 肩・肘・手(ラケット)の位置は、すべてワールド座標(m。racket.posを基準にした
+  // 相対値)のまま組み立てる。以前は画面ピクセル空間に直接オフセットを足していたため、
+  // カメラ角度(CAMERA_YAW)で視点を回すと腕だけ向きが追従せず破綻していたが、
+  // ここではワールド座標のまま組み立て、最後にまとめてworldToPixel()で投影する
+  // ことで、project()側のCAMERA_YAW回転と自動的に整合する。
+  //
+  // 奥(相手)は向かい合わせで見えるので鏡像＝右利きの右腕は画面左側の肩から伸びる。
+  // 手前(自分)は背後からの視点＝鏡像にならないので、右利きの右腕は画面右側の肩から伸びる。
+  // バック(サーブ/返球)・左利きは、それぞれ独立に腕(肩・肘)の左右を反転させる要因になる
+  // （右利きフォア基準からの反転が奇数回なら鏡像、偶数回なら元通り。例えば「左利きの
+  // バックサーブ」は2回反転して結果的に「右利きのフォアサーブ」と同じ腕の向きになる、
+  // という実際の見え方に合わせている）。サーブ側・レシーブ側どちらもこの2つのフラグで
+  // 同じように腕の向きを反転できる。ラバー面の色もサーブ側・レシーブ側どちらも
+  // このbackhandチェックの0/1だけで直接切り替わる（②ピッチ角には左右されない）。
+  // 左利きかどうかはどちらの色にも影響しない。
+  const backhandFlip = racket.backhand ? -1 : 1;
+  const leftHandedFlip = racket.leftHanded ? -1 : 1;
+  const mirrorX = backhandFlip * leftHandedFlip;
+  // サーブ側で「3球目以降のバックハンド」かどうか。この条件だけ、肩・肘の位置(と
+  // 下の胴体シルエットの位置)を専用の値に切り替える。サーブ(1球目)・フォアハンドは
+  // 従来通りの共通の値のまま変えない。
+  const isRallyBackhand = isServer && racket.backhand && (racket.activeShotNumber || 1) >= 3;
+  // レシーブ側「バック面」チェック時は、肘は肩-手の中点ちょうどに置いて
+  // （曲げの分を足さない）、手首〜肘(前腕)はまっすぐ伸ばした見た目のまま。
+  const straightArm = !isServer && racket.backhand;
+
+  // 肩・肘のオフセットは、横方向(x、mirrorXで左右反転)・高さ(z、正で上)の2軸だけを
+  // 使う(奥行きyへのオフセットは、元の画面ピクセル版でも使っていなかったため踏襲
+  // しない)。数値は元の画面ピクセル版の見た目にほぼ一致するよう、当時のピクセル
+  // 定数をこのシーンの実寸換算(横:約426px/m、高さ:約312px/m。project()のscale=1・
+  // VIEW_ZOOM=1基準)で置き換えたもの。
+  let handW = { x: racket.pos.x, y: racket.pos.y, z: racket.pos.z };
+  let shoulderW, elbowW;
+
+  if (isServer) {
+    if (isRallyBackhand) {
+      // 3球目以降のバックハンド：肘・肩ともコンパクトに構えた位置
+      // (旧: 肩オフセット{x:60,y:-60}px、肘オフセット{x:120,y:0}px)
+      elbowW = { x: handW.x + 0.281 * mirrorX, y: handW.y, z: handW.z };
+      // カメラ角度(CAMERA_YAW)が90°を超えて反対側(サーバーが手前)から見た状態になると、
+      // 肩が手より上にあるこの構えは「フ」の字が上下逆さまに見えてしまう(レシーブ側の
+      // 「フ」の字は肩が手より下にある構え)。90°を超えたら肩の上下(z)オフセットの符号を
+      // 反転させ、手前から見た時もレシーブ側と同じ向きの「フ」の字に見えるようにする
+      // (90°以下=従来通りの見た目はそのまま変えない)。
+      const shoulderZSign = CAMERA_YAW > 90 ? -1 : 1;
+      shoulderW = { x: handW.x + 0.141 * mirrorX, y: handW.y, z: handW.z + 0.192 * shoulderZSign };
+    } else if (racket.backhand) {
+      // サーブ(1球目)のバックハンド：肘は横に大きく張り出す(フォアハンドと同じ)。
+      // 肩は肘との曲がり角度がちょうど90°になるよう、肘から高さ方向(ワールドZ、上向き)
+      // へオフセットする。奥行き方向(ワールドY)のオフセットは無し(0)にする(「奥行き
+      // 方向の長さは0でいい」という指摘への対応。Yを使うと透視投影の都合でカメラ角度に
+      // よって上下が反転してしまうが、Zは水平方向の回転では変わらないのでその問題も
+      // 起きない)。長さは肘-手の半分くらい(「肩から肘までの長さを半分くらいに」という
+      // 指摘への対応。胴体のシルエット(下のSERVE_FIRSTSERVE_BACKHAND_BODY_DOWN_M)は
+      // shoulderW.zを基準に計算しているので、この値を短くすると連動して自動的に
+      // 低くなる)。
+      const UPPER_ARM_LENGTH_M = 0.14;
+      elbowW = { x: handW.x + 0.281 * mirrorX, y: handW.y, z: handW.z };
+      shoulderW = { x: elbowW.x, y: elbowW.y, z: elbowW.z + UPPER_ARM_LENGTH_M };
+    } else {
+      // サーブ(1球目)・フォアハンド：肘を横に大きく張り出し、肩は肘から斜め上へ
+      // (旧: 肘オフセット{x:120,y:0}px、肩=肘+{cos30°×65, -sin30°×65}px)
+      elbowW = { x: handW.x + 0.281 * mirrorX, y: handW.y, z: handW.z };
+      shoulderW = { x: elbowW.x + 0.132 * mirrorX, y: elbowW.y, z: elbowW.z + 0.104 };
+    }
+  } else if (straightArm) {
+    // レシーブ側「バック面」チェック時：前腕をまっすぐ伸ばした形。肘までの
+    // 距離は、サーブ側と同じ肘-手の距離(0.281m)にしている(以前は肩の仮想位置との
+    // 中点(0.176m)で前腕を短く見せていたが、「肘から手までがサーブ側より短い」
+    // という指摘を受けての調整)。肩は肘+{cos30°×65,-sin30°×65}pxと同じ式で求める。
+    elbowW = { x: handW.x + 0.281 * mirrorX, y: handW.y, z: handW.z };
+    shoulderW = { x: elbowW.x + 0.132 * mirrorX, y: elbowW.y, z: elbowW.z + 0.104 };
+  } else {
+    // レシーブ側フォア/バック(未チェック)：サーブ側「3球目以降のバックハンド」
+    // (isRallyBackhandの分岐)と、肘・肩の相対オフセットを完全に同じ値にして、
+    // ミラーの見た目になるようにする(肘: 手から{x:0.281,z:0}、
+    // 肩: 手から{x:0.141,z:0.192*shoulderZSign})。
+    // shoulderZSignの条件だけサーブ側と逆にする。カメラ角度(CAMERA_YAW)が90°を
+    // 超えると、レシーブ側は逆に(手前ではなく)奥・正面から見た状態になる＝
+    // ちょうどサーブ側が初期状態(0°)で見えているのと同じ向きになるため、90°を
+    // 境に符号を反転させる条件もサーブ側と逆にする必要がある。
+    // どちらかを変更したらもう一方も合わせて直すこと(ずれるとミラーでなくなる)。
+    elbowW = { x: handW.x + 0.281 * mirrorX, y: handW.y, z: handW.z };
+    const shoulderZSign = CAMERA_YAW > 90 ? 1 : -1;
+    shoulderW = { x: handW.x + 0.141 * mirrorX, y: handW.y, z: handW.z + 0.192 * shoulderZSign };
+  }
+
+  // ラケット(手)だけ、奥行き方向(ワールドY)へ少し前(net側=racket.forwardSignの向き)へ
+  // ずらす。以前は逆に胴体シルエットの方を奥へずらしていた(BODY_DEPTH_OFFSET_M)ため、
+  // カメラ角度を回すと肩と胴体シルエットが画面上で大きく離れて見える不具合の原因に
+  // なっていた(奥行きのズレは、カメラが真横に近いほど画面上の横方向のズレとして
+  // 映るため)。肩・肘はここでは動かさず(胴体シルエットとの繋がりに影響しない)、
+  // 手(=ラケット)だけを前に出すことで、「ラケットが体より前にある」という見た目を、
+  // 肩と胴体の繋がりを崩さずに再現する。
+  handW.y += racket.forwardSign * RACKET_VISUAL_FORWARD_OFFSET_M;
+
+  // レシーブ側だけ：実際にボールを打ち返した瞬間(triggerSwing→swingProgressが
+  // 0→1に進む間)、④縦スイングの値に応じて、肘を支点にラケットをわずかに振る
+  // 「フリック」の動きを加える（③ロールの肘支点回転と全く同じ仕組みに、追加で
+  // この分だけ回転させる）。サーブ側は既存の振り抜きアニメーション(バックスイング→
+  // フォロースルー)で④⑤の向きをすでに表現しているので、ここでは重複させない。
+  let flickForPivot = 0;
+  if (!isServer && racket.swingProgress !== null) {
+    const p = clamp(racket.swingProgress, 0, 1);
+    // 0→1の間で上がりきったら、そのまま保持する（振り終わったポーズのまま止める）。
+    const flickCurve = Math.sin(Math.min(p, 0.5) * Math.PI);
+    const FLICK_PIVOT_SCALE = 1.1; // ④の角度に対してどれだけ肘支点の回転に反映するか
+    // 打った瞬間(triggerSwing時点)の④の値で固定する。打った後にスライダーを動かしても
+    // 再生中/再生済みのフリックの見た目は変化しない。
+    flickForPivot = deg2rad(racket.swingDirAtHit || 0) * FLICK_PIVOT_SCALE * flickCurve;
+  }
+
+  // ③ロール角の回転支点は、ラケット中心ではなく肘（前腕の回転軸）にする。支点を肘に
+  // することで、ロールに応じてラケットの奥行き位置(＝遠近スケール)も一緒に自然に
+  // 動く。ワールド座標のまま奥行き軸(世界のY軸)まわりに回転させるため、以前のように
+  // 「遠近スケールの誇張」で疑似的に奥行き変化を作る必要がなくなり、本物の奥行き
+  // 変化になった(下のworldToPixel()で自動的に反映される)。mirrorXを掛けて左右
+  // どちらの構えでも同じ向きになるようにする。
+  //
+  // この③ロールの回転は、必ず④⑤⑥のスイング演出より先(この位置)に適用する。
+  // ④⑤は物理側(racketSwingVelocity)ではロールに関係なく常にワールドZ(④=上下)・
+  // ワールドX(⑤=左右)へ働く「絶対的な」ブラシ成分として計算されている。以前は
+  // ロールの回転をここではなく④⑤⑥の演出の後(最後)に適用していたため、④⑤が
+  // 作った腕の動き(肘・肩支点の回転や横方向オフセット)ごと、後からロールで
+  // さらに回転させてしまっていた。その結果、例えば③ロール=-90°の状態で⑤だけを
+  // 動かすと、本来ワールドX(左右)に動くはずの見た目がワールドZ(上下)の動きに
+  // 入れ替わってしまう不具合になっていた(Y軸回転はX/Z成分を混ぜ合わせるため)。
+  // ここで③ロールを先に適用し、腕が「ロール後の姿勢」になった状態を基準にして
+  // ④⑤⑥のスイング演出を追加することで、④⑤の動きが③の値によらず常に狙った
+  // ワールド軸(④=Z、⑤=X)方向の動きとして見えるようになる。
+  const rollForPivot = (deg2rad(racket.rollAngle || 0) + flickForPivot) * mirrorX;
+  handW = pivotAroundWorld(handW, elbowW, "y", rollForPivot);
+
+  // レシーバーは自動追従でボールの位置に既にラケットが合っているので、当てる瞬間に
+  // さらに前へ振り抜く動き(バックスイング→フォロースルー)は付けない。このアニメーションは
+  // サーバー（静止した状態から自分でスイングして打ちに行く側）だけに使う。
+  //
+  // depthPos/receiveDepthPosは、遠近スケールの誇張(下で最後にまとめて適用)のために
+  // ここで求めておく「⑥の伸び分だけ奥行き移動した場合の投影結果」。
+  let depthPos = null, depthCurve = 0, depthExaggeration = 0;
+  let receiveDepthPos = null, receiveDepthCurve = 0, receiveDepthExaggeration = 0;
+
+  if (isServer && racket.swingProgress !== null) {
+    const p = racket.swingProgress;
+    // 見た目のスイング軌道は、打った瞬間(triggerSwing時点)の④⑤⑥の値で計算する。
+    // これにより、打った後に④⑤⑥のスライダーを動かしても、再生中/再生済みの
+    // スイングの見た目自体は変化しない。
+    const swingSnapshot = { ...racket, swingDir: racket.swingDirAtHit, swingY: racket.swingYAtHit, swingSpeed: racket.swingSpeedAtHit };
+    // 振り抜きの「伸び」は実際のスイング速度(⑥)に応じて変える。⑥=0の時はreachM=0
+    // (前後の振り抜き自体が無い、面の向きに構えたまま当てるだけの見た目)にし、
+    // ⑥を上げるほど振り抜きの伸びが大きくなるようにする。
+    const forwardSpeed = Math.abs(racketSwingVelocity(swingSnapshot).y);
+    const REACH_MAX_M = 0.5; // ⑥が十分速い時の振り抜きの伸び(m)
+    const REACH_FULL_SPEED = 20; // この前進速度(m/s)でREACH_MAX_Mに達する
+    const reachM = clamp((forwardSpeed / REACH_FULL_SPEED) * REACH_MAX_M, 0, REACH_MAX_M);
+
+    // curveは「振り始め(p=0)の引き=バックスイング」から「振り終わり(p=1)で
+    // ちょうど1」まで動く。バックスイングの深さ(0.35)だけを打点を遅らせる時間に
+    // 応じてcomputeDelaySwingScale()倍することで、p=1側の値(=④等の角度と一致
+    // させている基準点)は変えずに、振り始めの引きの大きさだけを変化させられる
+    // （-D + (1+D)*(...) の形にすると、Dの値に関わらずp=1では必ずちょうど1になる）。
+    const BACKSWING_DEPTH = 0.35 * computeDelaySwingScale(racket);
+    const curve = -BACKSWING_DEPTH + (1 + BACKSWING_DEPTH) * (1 - Math.cos(p * Math.PI)) / 2;
+
+    // ⑥前後スイング：肘・手をまとめて奥行き方向(ワールドY、forwardSignの向き)へ
+    // curve分だけ動かす。肘は手ほど大きく動かさず、控えめな割合だけ一緒に動かす
+    // （実際の卓球でも肘自体がスイング方向へわずかに動くため）。
+    const ELBOW_FOLLOW_FACTOR = 0.7;
+    const forwardReachM = racket.forwardSign * reachM * curve;
+    handW.y += forwardReachM;
+    elbowW.y += forwardReachM * ELBOW_FOLLOW_FACTOR;
+
+    // ⑤横スイングは、⑥前後スイングと同じ考え方で「肩支点の回転」ではなく、
+    // ワールドX方向への直接の距離移動として表現する（レシーブ側の既存のフリック
+    // 演出と同じ発想）。以前は肩を支点に鉛直軸まわりに回転させていたが、回転だと
+    // 水平面内で円弧を描く関係上、奥行き(Y)方向にも同時に動いてしまう上、可動域が
+    // ±160°と広いため大きい値では回転が一周に近づいて「＋なのに－と同じ側、
+    // むしろより大きく動く」といった直感に反する動き方にもなっていた。さらに
+    // ③ロール角が効いている時は、そのねじれた円弧の動きが斜め方向(例:
+    // ロール-90°で＋が右上・－が右下)に見えてしまう原因にもなっていた。
+    // ⑤は「左右にどれだけこするか」を表す量なので、常にワールドX方向だけへ、
+    // 値に比例した距離だけ直線移動するようにすることで、③の値や⑤の大きさに
+    // よらず狙った通り(プラスで右、マイナスで左)の見た目にする。
+    // mirrorXは掛けない(元の回転版と同じく、③同様に絶対的な左右として扱う。
+    // racketSwingVelocity()の物理計算もmirrorXを掛けていないので合わせている)。
+    const SWING_Y_MAX_M = 0.7; // ⑤が可動域の最大(±160°)相当の時に手を左右へ動かす距離(m。見た目の動きを2倍にする指摘を受けて0.35→0.7に。打球・回転の物理(racketSwingVelocity())には使われないパラメータなので、ここを変えても弾道・スピンには一切影響しない)
+    const swingYOffsetM = clamp((racket.swingYAtHit || 0) / 160, -1, 1) * SWING_Y_MAX_M * curve;
+    elbowW.x += swingYOffsetM * ELBOW_FOLLOW_FACTOR;
+    handW.x += swingYOffsetM;
+
+    // ④縦スイングは、肘を支点に手をさらに回転させて表現する（上下に平行移動させる
+    // のではなく、肘から手までの腕の長さを保ったまま角度だけ変える）。mirrorXを
+    // 掛けて、④がプラスなら左右どちらの構えでも手が上へ上がるようにする。
+    // レシーブ側のフリック(flickForPivot)と同じ、奥行き軸(世界のY軸)まわりの回転・
+    // 同じ倍率(FLICK_PIVOT_SCALE)にして、見た目の動きの大きさをレシーブ側と揃える
+    // (以前は横軸(X軸)まわりの回転で、レシーブ側より動きが小さく見えていた)。
+    const FLICK_PIVOT_SCALE = 1.1; // レシーブ側のFLICK_PIVOT_SCALEと同じ値
+    const swingDirAngle = deg2rad(racket.swingDirAtHit || 0) * FLICK_PIVOT_SCALE * mirrorX * curve;
+    handW = pivotAroundWorld(handW, elbowW, "y", swingDirAngle);
+
+    // 遠近スケール(大きさ)の誇張用データを保存しておく。⑥前後スイングが速いほど
+    // 振り抜きの奥行き移動(reachM)も大きくなるので、その分カメラの遠近スケールも
+    // 一緒に補間する→振り終わりでラケットが大きく(手前に来たように)見える。
+    // 実際の遠近スケール差はわずかなので、体感しやすいよう差分自体を誇張して増幅する。
+    const depthWorld = { x: racket.pos.x, y: racket.pos.y + racket.forwardSign * reachM, z: racket.pos.z };
+    depthPos = worldToPixel(depthWorld.x, depthWorld.y, depthWorld.z);
+    depthCurve = curve;
+    depthExaggeration = 2.5;
+  }
+
+  // レシーブ側だけ：実際にボールを打ち返した瞬間、⑤横スイングの値に応じて、
+  // 手（と控えめに肘も）を横方向へ直接ずらす「フリック」の動きを加える。腕の姿勢に
+  // 関わらず確実に横へ動くよう、回転ではなくワールドX方向への直接オフセットにする
+  // （肘は手ほど大きく動かさず、控えめに追従させる）。
+  if (!isServer && racket.swingProgress !== null) {
+    const sp = clamp(racket.swingProgress, 0, 1);
+    // 0→1の間で上がりきったら、そのまま保持する（振り終わったポーズのまま止める）。
+    const shoulderFlickCurve = Math.sin(Math.min(sp, 0.5) * Math.PI);
+    // 「打点を遅らせる時間」が長いほど、余裕を持って大きくフリックできるように
+    // FLICK_MAX_MをcomputeDelaySwingScale()倍する(既定値100msでは従来通り)。
+    const FLICK_MAX_M = 0.47 * computeDelaySwingScale(racket); // ⑤が±80°の時に手を横へずらす最大量(m。見た目の動きを2倍にする指摘を受けて0.235→0.47に。打球・回転の物理(racketSwingVelocity())には使われないパラメータなので、ここを変えても弾道・スピンには一切影響しない)
+    const ELBOW_FOLLOW_FACTOR = 0.35; // 肘も手と同じ向きへ、控えめな割合だけ一緒に動かす
+    // 打った瞬間(triggerSwing時点)の⑤の値で固定する。打った後にスライダーを動かしても
+    // 再生中/再生済みのフリックの見た目は変化しない。
+    const swingYFrac = clamp((racket.swingYAtHit || 0) / 80, -1, 1);
+    const offsetXM = swingYFrac * FLICK_MAX_M * shoulderFlickCurve;
+    handW.x += offsetXM;
+    elbowW.x += offsetXM * ELBOW_FOLLOW_FACTOR;
+
+    // レシーブ側も、サーブ側と同じく⑥前後スイングの値に応じて肘・手を実際に
+    // ワールド座標(m)で奥行き方向へ動かす。以前は「レシーブ側は自動追従で既に
+    // ボール位置にラケット(racket.pos)があるため、位置を動かすとヒット判定の
+    // 基準位置からずれる」という理由で、遠近法上の大きさ(scale)だけを変える
+    // 疑似的な表現にしていたが、ここで動かすhandW/elbowWはracket.posとは別の
+    // 描画専用のローカル変数であり、動かしてもracket.pos自体(＝ヒット判定の
+    // 基準位置)には一切影響しない。そのため、サーブ側と全く同じ「本物の3D移動」
+    // に揃えられる。レシーブ側の実際の前進方向(forwardSign)はネット方向(＝
+    // カメラのある自陣から遠ざかる向き)で、サーブ側とは符号が逆になる
+    // (forwardSignに既に織り込み済みなので、ここでは同じ式でよい)。
+    const RECEIVE_REACH_MAX_M = 0.6 * computeDelaySwingScale(racket); // ⑥が十分速い時の振り抜きの伸び(m)。差をはっきりさせるため大きめにする
+    const RECEIVE_REACH_FULL_SPEED = 10; // ⑥(0〜20)がこの値でRECEIVE_REACH_MAX_Mに達する（racketFrictionの「10で最大」と合わせる）
+    const receiveReachM = clamp(((racket.swingSpeedAtHit || 0) / RECEIVE_REACH_FULL_SPEED) * RECEIVE_REACH_MAX_M, 0, RECEIVE_REACH_MAX_M);
+    const FORWARD_ELBOW_FOLLOW_FACTOR = 0.7; // サーブ側の⑥用ELBOW_FOLLOW_FACTORと揃える
+    const receiveForwardReachM = racket.forwardSign * receiveReachM * shoulderFlickCurve;
+    handW.y += receiveForwardReachM;
+    elbowW.y += receiveForwardReachM * FORWARD_ELBOW_FOLLOW_FACTOR;
+
+    // 遠近スケール(大きさ)の誇張用データも、サーブ側と同じ考え方で保存しておく
+    // (本物の移動だけでは差がわずかなので、体感しやすいよう差分自体を誇張して増幅する)。
+    const receiveDepthWorld = { x: racket.pos.x, y: racket.pos.y + racket.forwardSign * receiveReachM, z: racket.pos.z };
+    receiveDepthPos = worldToPixel(receiveDepthWorld.x, receiveDepthWorld.y, receiveDepthWorld.z);
+    receiveDepthCurve = shoulderFlickCurve;
+    receiveDepthExaggeration = 4.5; // サーブ側(2.5)より強めにして変化をはっきりさせる
+  }
+
+  // ③ロールの回転(flickForPivot込み)は、この関数の前半(④⑤⑥のスイング演出より前)で
+  // 既に適用済み。ここで改めて適用すると二重に回転してしまうため行わない。
+
+  // ここまでで求めたワールド座標(m)の各点を、まとめて画面へ投影する。project()側の
+  // CAMERA_YAW回転がここで一括して効くため、カメラ角度を変えても腕全体が
+  // 破綻せずに追従する。
+  const shoulder = worldToPixel(shoulderW.x, shoulderW.y, shoulderW.z);
+  const elbow = worldToPixel(elbowW.x, elbowW.y, elbowW.z);
+  const handProjected = worldToPixel(handW.x, handW.y, handW.z);
+
+  // 遠近スケール(大きさ)は、まず本物の投影結果(handProjected.scale。⑥の伸び・
+  // ④⑤の回転・③ロールによる奥行き移動が全て反映済み)を土台にし、その上に
+  // ⑥前後スイング分だけ追加の誇張を上乗せする（差はわずかなので、体感しやすい
+  // よう増幅する）。
+  let handPosScale = handProjected.scale;
+  if (depthPos) {
+    handPosScale += (depthPos.scale - restHandPos.scale) * depthCurve * depthExaggeration;
+  }
+  if (receiveDepthPos) {
+    handPosScale += (receiveDepthPos.scale - restHandPos.scale) * receiveDepthCurve * receiveDepthExaggeration;
+  }
+  handPosScale = Math.max(0.2, handPosScale); // 誇張しすぎて潰れないための安全弁
+
+  const handPos = { x: handProjected.x, y: handProjected.y, scale: handPosScale };
+
+  // グリップ(柄)は、腕(肘)がある方向へ向かって伸びているように見せたいので、
+  // 固定角度ではなく「ラケット中心から肘への向き」から逆算する（肩の位置を変えても破綻しない）。
+  // 上で肘を支点にラケット位置自体をロール分回転させたので、この角度には
+  // 既にロールの影響が織り込まれている。
+  const elbowToHandDist = Math.hypot(handPos.x - elbow.x, handPos.y - elbow.y);
+  const handToElbowDeg = Math.atan2(elbow.y - handPos.y, elbow.x - handPos.x) * 180 / Math.PI;
+
+  return {
+    isServer, restHandPos, shoulder, elbow, handPos, mirrorX, elbowToHandDist,
+    handToElbowDeg,
+    shoulderW, // ワールド座標(m)の肩位置。drawRacketBase()の胴体シルエット配置で使う
+    wristAngle: racket.angle || 0,
+    tiltRaw: (racket.tiltX !== undefined) ? racket.tiltX : 90,
+    rollRaw: (racket.rollAngle !== undefined) ? racket.rollAngle : 0,
+    gripBaseAngleDeg: handToElbowDeg - 90
+  };
+}
+
+// ---- ラケット部品のうち「補助円」まで：常にボールより奥(背面)に描く。
+// レシーブ側は、ボールがラケット(ラバー面)の背面になるよう、この関数と
+// drawRacketBladeAndArm()の間にボールを挟んで描画する(main.jsのrender()を参照)。
+function drawRacketBase(racket) {
+  const g = computeRacketGeometry(racket);
+  const { isServer, restHandPos, shoulderW, mirrorX, handPos } = g;
+
+  ctx.save();
+
+  // サーブ側・レシーブ側どちらも、右利き/左利き・フォア/バックの左右反転が一目で
+  // 分かるように、薄い胴体のシルエットを描く。胴体は腕(肩・肘)と同じ側(mirrorXが
+  // 同じ符号)に配置する＝右利きなら腕・肘・肩パーツの右側、左利きならその逆（左側）になる。
+  // レシーブ側は「体の正面でボールを捉える」姿勢なので、サーブ側ほど大きくは
+  // ずらさない。⑤横スイングに応じた体の傾きは付けず、シンプルな配置のみにする。
+  // サーブ側のフォアハンドは、肩(shoulderW)の位置を基準に、そこから少しだけ
+  // 体幹側へ引き戻した位置を胴体の中心にする（肩の真下ではなく、肩口とつながって
+  // 見えるようにするため）。バックハンドはサーブ(1球目)は従来通りの固定オフセット
+  // のまま、3球目以降だけ胴体の中心がラケットと同じ位置(オフセット無し)になる
+  // ようにする(既存の仕様)。
+  //
+  // カメラ角度(CAMERA_YAW)で視点を回しても胴体が正しい位置に追従するよう、
+  // ここではワールド座標(m。racket.pos/shoulderW基準)でオフセットを組み立ててから
+  // まとめてworldToPixel()で投影する(以前は画面ピクセル空間に直接足していた)。
+  // 各定数は元の画面ピクセル版のオフセットをこのシーンの実寸換算(横:約426px/m、
+  // 高さ:約312px/m)で置き換えたもの。
+  // フォアハンド時、肩から体幹側へ引き戻す量(m。旧40px=0.094)。カメラ角度(CAMERA_YAW)を
+  // 回すと、このワールドX方向のオフセットが特定の角度(90°付近など)で肩と胴体シルエットを
+  // 大きく引き離して見せてしまう(「カメラを90°にすると肩と胴体が分離して見える」という
+  // 指摘への対応)ため、0にした。0でも肩は胴体シルエットの内側に収まる(実測で正面から見た
+  // 時の重なり具合はほぼ変わらない)。
+  const SERVE_BODY_PULL_M = 0.1;
+  const SERVE_BACKHAND_BODY_OFFSET_M = 0.211; // 1球目(サーブ)のバックハンド時のオフセット(旧90px)
+  const SERVE_BODY_DOWN_M = 0.208; // サーブ側フォアハンド、肩から胴体中心までの高さの差(旧40px)
+  // 1球目(サーブ)のバックハンドだけ、胴体の高さ(肩から胴体中心までの差)を独立して
+  // 調整できるようにする専用定数。フォアハンドのSERVE_BODY_DOWN_Mとは別物なので、
+  // これを変えてもフォアハンドの見た目には影響しない。
+  const SERVE_FIRSTSERVE_BACKHAND_BODY_DOWN_M = 0.128;
+  // 3球目以降のバックハンドを、カメラ角度90°超(手前)から見た時だけ胴体をさらに
+  // 下げる量(m)。この値を大きくするほど下がる。調整したい場合はこの数値を変更する。
+  const RALLY_BACKHAND_PASTNINETY_EXTRA_DOWN_M = 0.30;
+  // レシーブ側の胴体の左右位置は、フォア面・バック面で独立の定数にしている
+  // (以前は共通の式(RECEIVE_BODY_OFFSET_M*mirrorX - RECEIVE_BODY_BASE_PULL_M、
+  // 左利き時だけ別途RECEIVE_BODY_X_LEFTHANDED_Mを加算)だったため、片方を調整すると
+  // もう片方も一緒に動いてしまっていた)。mirrorXは利き手・フォア/バックの左右反転を
+  // 引き続き適用するので、右利き・左利きどちらでも正しく左右が入れ替わる。
+  const RECEIVE_BODY_X_FOREHAND_M = 0; // フォア面：ラケット中心からのXオフセット(m)
+  const RECEIVE_BODY_X_BACKHAND_M = 0.522; // バック面：同上(旧90px-90px+180pxの結果を踏襲)
+  // computeRacketGeometry()内の肩・肘の計算と同じ条件をここでも使う(drawRacketBase()は
+  // 別関数でcomputeRacketGeometry()のisRallyBackhandを直接参照できないため再計算する)。
+  const isRallyBackhand = isServer && racket.backhand && (racket.activeShotNumber || 1) >= 3;
+  // レシーブ側の胴体の高さは、②ピッチ角の値によらず固定にする（フォア/バックでだけ変える）。
+  const RECEIVE_BODY_DOWN_FOREHAND_M = 0.300; // フォア面(backhand=false)：低め(旧80px)
+  const RECEIVE_BODY_DOWN_BACKHAND_M = 0.064;  // バック面(backhand=true)：高め(旧20px)
+  // 胴体シルエットの奥行き(ワールドY)位置。以前はracket.pos.yをそのまま使っていて
+  // 独立した調整ができなかった(「初期状態でサーブ側はもっと奥、レシーブ側はもっと
+  // 手前に配置したい」という指摘への対応)。racket.forwardSignの逆向き(=ネットから
+  // 見て自陣の奥側、サーブ側は-Y、レシーブ側は+Y)へオフセットすることで、サーブ側は
+  // より奥(カメラから遠く)へ、レシーブ側はより手前(カメラに近く)へ、同じ1つの定数で
+  // 両方とも自然な向きにずらせる…という意図だったが、この奥行き(Y)方向のズレは、
+  // カメラ角度(CAMERA_YAW)を正面(0°)以外へ回すと画面上で肩から大きく離れて見える
+  // 副作用があった(奥行きの差は、カメラが真横(90°)に近づくほど画面上の「横」方向の
+  // ズレとして映るため)。実測でカメラ角度を0〜180°まで振ってみたところ、この値を
+  // 0にしても正面から見た時の見た目はほぼ変わらない(肩と胴体シルエットの重なり具合が
+  // 0.785→0.846程度で、依然として重なったまま)一方、0でない値のままだと90°付近で
+  // 肩と胴体が完全に分離して見えてしまっていたため、0にしてどのカメラ角度でも
+  // 肩と胴体シルエットが繋がって見えるようにしていた。
+  // その後、「90°付近ではラケット・腕より胴体シルエットが台に近すぎる(＝もっと台から
+  // 遠ざけたい)」という指摘を受け、sin(CAMERA_YAW)で重み付けした値を使うようにする。
+  // 0°・180°(=真正面/真後ろ)では0のままなので上記の「肩と繋がって見える」見た目は
+  // 保たれ、90°に近づくカメラでだけ胴体を後ろへ下げる。
+  const BODY_DEPTH_OFFSET_BASE_M = 0.08;
+  const BODY_DEPTH_OFFSET_M = BODY_DEPTH_OFFSET_BASE_M * Math.sin(deg2rad(CAMERA_YAW));
+  const bodyDepthY = racket.pos.y - racket.forwardSign * BODY_DEPTH_OFFSET_M;
+  const bodyCenterW = {
+    x: isServer
+      ? (isRallyBackhand
+          ? racket.pos.x
+          : racket.backhand
+            ? racket.pos.x + SERVE_BACKHAND_BODY_OFFSET_M * mirrorX
+            : shoulderW.x + SERVE_BODY_PULL_M * mirrorX)
+      : racket.pos.x + (racket.backhand ? RECEIVE_BODY_X_BACKHAND_M : RECEIVE_BODY_X_FOREHAND_M) * mirrorX,
+    z: isServer
+      // 3球目以降のバックハンドかつカメラ角度(CAMERA_YAW)が90°を超えた時は、
+      // computeRacketGeometry()側でshoulderW.zの上下が反転している(手前から見ても
+      // レシーブ側と同じ向きの「フ」の字に見えるようにするため)ので、ここでも
+      // 符号を合わせて反転させ、胴体の中心が肩から見て正しい側(手寄り)にくるように
+      // した上で、さらにRALLY_BACKHAND_PASTNINETY_EXTRA_DOWN_M分だけ下げる
+      // (「180°回転させた時、胴体のシルエットをもっと下にしたい」という指摘への調整。
+      // この値を大きくするほど下がる)。
+      ? (isRallyBackhand && CAMERA_YAW > 90
+          ? shoulderW.z + SERVE_BODY_DOWN_M - RALLY_BACKHAND_PASTNINETY_EXTRA_DOWN_M
+          : isRallyBackhand
+            ? shoulderW.z - SERVE_BODY_DOWN_M
+            // 1球目のバックハンドだけ、SERVE_FIRSTSERVE_BACKHAND_BODY_DOWN_Mという
+            // 独立した定数を使う(フォアハンドのSERVE_BODY_DOWN_Mとは別物)。
+            : racket.backhand
+              ? shoulderW.z - SERVE_FIRSTSERVE_BACKHAND_BODY_DOWN_M
+              : shoulderW.z - SERVE_BODY_DOWN_M)
+      // レシーブ側「フォア/バック(未チェック)」も、カメラ角度が90°を超えたら
+      // (=サーブ側の初期状態と同じ向きに見える側)、サーブ側「3球目以降のバックハンド」の
+      // 初期状態と同じ高さの式(shoulderW.z - SERVE_BODY_DOWN_M。この時点でshoulderW.zは
+      // computeRacketGeometry()側で既に反転済みなので、そのまま使えばサーブ側の初期状態と
+      // 一致する)に揃える(90°以下は従来通りの固定オフセットのまま)。
+      : (!racket.backhand && CAMERA_YAW > 90
+          ? shoulderW.z - SERVE_BODY_DOWN_M
+          : racket.pos.z - (racket.backhand ? RECEIVE_BODY_DOWN_BACKHAND_M : RECEIVE_BODY_DOWN_FOREHAND_M))
+  };
+  const bodyCenterProjected = worldToPixel(bodyCenterW.x, bodyDepthY, bodyCenterW.z);
+  const bodyCenter = { x: bodyCenterProjected.x, y: bodyCenterProjected.y };
+  ctx.save();
+  // 胴体の形そのものはまっすぐ固定のまま、⑤横スイングに応じてグラデーション(陰影)の
+  // ハイライト位置だけを左右に動かす。丸みのある胴体に光が当たっていて、実際に
+  // その場でグルグルと軸回転していると、明るく見える面の位置だけが左右に動いて
+  // 見える…という理屈をシルエットで再現する。数値を動かしただけでは反応させず、
+  // 実際に打球してスイングアニメーションが始まった時だけ動かす。
+  const BODY_TURN_RANGE_DEG = isServer ? 160 : 80; // ⑤の可動域の最大値に合わせる
+  const swingActiveFrac = racket.swingProgress !== null
+    ? Math.sin(Math.min(clamp(racket.swingProgress, 0, 1), 0.5) * Math.PI)
+    : 0;
+  // 打った瞬間(triggerSwing時点)の⑤の値で固定する（swingActiveFracがゲートしていても、
+  // フォロースルー中は打球後もracket.swingYの現在値を読み続けてしまうため、値自体も固定する）。
+  const turnFrac = clamp((racket.swingYAtHit || 0) / BODY_TURN_RANGE_DEG, -1, 1) * swingActiveFrac;
+  const bodyRX = 50 * restHandPos.scale;
+  const bodyRY = 85 * restHandPos.scale;
+  const highlightFrac = clamp((turnFrac + 1) / 2, 0.08, 0.92); // 0(左端寄り)〜1(右端寄り)
+  const bodyGrad = ctx.createLinearGradient(bodyCenter.x - bodyRX, 0, bodyCenter.x + bodyRX, 0);
+  bodyGrad.addColorStop(0, "rgba(70, 82, 101, 0.32)");
+  bodyGrad.addColorStop(highlightFrac, "rgba(130, 143, 164, 0.42)");
+  bodyGrad.addColorStop(1, "rgba(70, 82, 101, 0.32)");
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.ellipse(bodyCenter.x, bodyCenter.y, bodyRX, bodyRY, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.translate(handPos.x, handPos.y);
+  ctx.scale(handPos.scale, handPos.scale);
+
+  // ブレードは実体のある円柱として描くため、グリップとの継ぎ目を隠す補助円は不要。
+
+  ctx.restore();
+}
+
+// ---- ラケット部品のうち、ブレード(円柱)・グリップ・腕：常にボールより手前(前面)に描く。
+function drawRacketBladeAndArm(racket) {
+  const g = computeRacketGeometry(racket);
+  const { isServer, shoulder, elbow, handPos, wristAngle, tiltRaw, rollRaw, gripBaseAngleDeg, handToElbowDeg, elbowToHandDist } = g;
+
+  // サーブ側は奥(遠く)に配置されているため、遠近法(handPos.scale)だけだとラケット
+  // (ラバー部分)がレシーブ側と比べてかなり小さく見えてしまう。実写通りの縮尺ではなく、
+  // 見やすさを優先したデフォルメとして、サーブ側だけ描画サイズに補正倍率をかけて
+  // 大きく見せる（腕の長さ・位置(shoulder/elbow/handPosそのもの)には影響させず、
+  // ここで描くブレード・グリップ・手のひらの大きさだけを底上げする）。
+  const BLADE_DISPLAY_CORRECTION = isServer ? 1.35 : 1.35;
+  const bladeScale = handPos.scale * BLADE_DISPLAY_CORRECTION;
+
+  ctx.save();
+  ctx.translate(handPos.x, handPos.y);
+  ctx.scale(bladeScale, bladeScale);
+
+  // ---- ブレード(面)：「すごく高さの低い円柱」として、実際に厚みのある立体で描く。
+  // 円周上の点を円柱の上面・下面(両端)に配置し、racketNormal()と全く同じ
+  // 回転順序(ピッチ→ヨー→ロール)をそのまま各点に適用して、側面(帯)・カメラ側の面を
+  // 画家のアルゴリズム(奥から手前の順)で描く。①②③のどれを動かしても、実際に
+  // 立体が回転しているのと同じ計算になる。
+  ctx.save();
+
+  const pitchRad = deg2rad(90 - tiltRaw) * racket.forwardSign;
+  // ラケット自体の向き(wristAngle=①ヨー角)は、project()と同じくワールド座標上の
+  // 絶対的な向きとして扱いたい。ここでのブレードの立体は(handPosの位置とは別に)
+  // 常にCAMERA_YAW=0の固定カメラを前提にしたローカル座標で組み立てているため、
+  // project()側のCAMERA_YAW回転をそのままこちらにも掛けることで、カメラ角度を
+  // 変えてもラケット面が世界に対して正しい向きのまま(=見た目だけが一緒に回る)ようにする。
+  // CAMERA_YAWは①ヨー→②ピッチ→③ロールを全部適用し終えた「最終的な向き」を、
+  // さらに鉛直軸(Z軸)まわりに回す一番外側の回転として掛ける必要がある。以前は
+  // ①ヨーの角度にCAMERA_YAWを直接足し込んでいた(=③ロールより先に適用されていた)ため、
+  // ③ロールが0でない時だけ、カメラ角度を回しても面の向きが正しく追従せず、③ロールの
+  // 見た目が反映されない不具合があった(Z軸回転とY軸回転は順序を入れ替えると結果が
+  // 変わるため)。
+  const yawRad = deg2rad(wristAngle);
+  const rollRad = deg2rad(rollRaw);
+  const cameraYawRad = deg2rad(CAMERA_YAW);
+  const rotateFace = v => Vec3.rotateZ(Vec3.rotateY(Vec3.rotateZ(Vec3.rotateX(v, pitchRad), yawRad), rollRad), cameraYawRad);
+
+  const R_OUTER = 27, R_INNER = 26, THICK = 4, segments = 28;
+  // ローカルx軸=世界のx軸、ローカルy軸(画面は下向きが正)=世界のz軸(上向きが正)の反転に
+  // 対応させる(worldToPixelの高さ変換と向きを揃える)。世界y(奥行き)成分は、手前にある
+  // ほどわずかに大きく見える疑似遠近感として使う。
+  const DEPTH_SCALE = 0.01;
+  const project = p => {
+    const s = 1 + p.y * DEPTH_SCALE;
+    return { x: p.x * s, y: -p.z * s };
+  };
+  const pathFor = pts => {
+    ctx.beginPath();
+    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.closePath();
+  };
+
+  const topRim = [], botRim = [];
+  for (let i = 0; i <= segments; i++) {
+    const a = (i / segments) * Math.PI * 2;
+    const lx = Math.cos(a) * R_OUTER, lz = Math.sin(a) * R_OUTER;
+    topRim.push(rotateFace({ x: lx, y: THICK / 2, z: lz }));
+    botRim.push(rotateFace({ x: lx, y: -THICK / 2, z: lz }));
+  }
+  // 上面・下面のどちらがカメラ側(手前)を向いているかは、回転後のY(奥行き)が大きい方。
+  // 奥側の面は側面と手前の面に完全に隠れるので描く必要がない。
+  const topIsFront = rotateFace({ x: 0, y: THICK / 2, z: 0 }).y >= rotateFace({ x: 0, y: -THICK / 2, z: 0 }).y;
+  const frontLocalY = topIsFront ? THICK / 2 : -THICK / 2;
+  const frontRim = (topIsFront ? topRim : botRim).map(project);
+
+  // 側面（木口）：円周を分割した四角形を、奥→手前の順(画家のアルゴリズム)で描く。
+  // 各四角形の外向き法線と光源方向の内積で明暗を付け、円柱の丸みが分かるようにする。
+  const lightDir = Vec3.normalize({ x: -0.4, y: 0.6, z: 0.65 });
+  const topP = topRim.map(project), botP = botRim.map(project);
+  const quads = [];
+  for (let i = 0; i < segments; i++) {
+    const aMid = ((i + 0.5) / segments) * Math.PI * 2;
+    const normal = rotateFace({ x: Math.cos(aMid), y: 0, z: Math.sin(aMid) });
+    const quadDepth = (topRim[i].y + topRim[i + 1].y + botRim[i].y + botRim[i + 1].y) / 4;
+    quads.push({ i, normal, quadDepth });
+  }
+  quads.sort((a, b) => a.quadDepth - b.quadDepth);
+  quads.forEach(q => {
+    const i = q.i;
+    ctx.beginPath();
+    ctx.moveTo(topP[i].x, topP[i].y);
+    ctx.lineTo(topP[i + 1].x, topP[i + 1].y);
+    ctx.lineTo(botP[i + 1].x, botP[i + 1].y);
+    ctx.lineTo(botP[i].x, botP[i].y);
+    ctx.closePath();
+    const brightness = clamp(Vec3.dot(q.normal, lightDir) * 0.5 + 0.55, 0.15, 1);
+    ctx.fillStyle = lerpColorHex("#2c1c08", "#d4a373", brightness);
+    ctx.fill();
+  });
+
+  // カメラ側の面（実際の卓球ラケットは150×157mm程度とほぼ円形。木の縁）
+  pathFor(frontRim);
+  ctx.fillStyle = "#d4a373";
+  ctx.fill();
+  ctx.strokeStyle = "#5c3d11";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // フォア面(赤)/バック面(黒)は、基本は「バック面」チェックボックスだけで直接
+  // 切り替える(②ピッチ角の値では変化しない)。以前はレシーブ側だけ②ピッチ角に
+  // 応じて赤↔黒を連続的にブレンドし、チェック時はさらにその向きを反転する仕組みだったが、
+  // サーブ側と同じ挙動(デフォルトはフォア面、チェックでバック面を選ぶ)に揃えた。
+  //
+  // ただし、カメラ角度(CAMERA_YAW)を回してラケットを裏側から見ることになった場合
+  // (=topIsFrontが反転した場合)は、実際に見えている面が入れ替わっているので、
+  // 塗る色もそれに合わせて反転させる。そうしないと、裏から見ているのに元のまま
+  // (例えばフォア面設定なら常に赤)が塗られてしまい、現実のラケット(片面が固定で
+  // 赤、もう片面が固定で黒)と矛盾した見た目になる。①ヨー角(wristAngle)を大きく
+  // 振っている場合は90°より手前/奥で反転することもあるため、固定の角度ではなく
+  // 実際に見えている面(topIsFront)を基準にする。
+  // blackFrac: 0=完全に赤 〜 1=完全に黒。
+  const blackFrac = (racket.backhand === topIsFront) ? 1 : 0;
+
+  const rubberRim = [];
+  for (let i = 0; i <= segments; i++) {
+    const a = (i / segments) * Math.PI * 2;
+    rubberRim.push(project(rotateFace({ x: Math.cos(a) * R_INNER, y: frontLocalY, z: Math.sin(a) * R_INNER })));
+  }
+  pathFor(rubberRim);
+  const highlightX = lerp(-6, -8, blackFrac);
+  // ハイライト(光の反射)の上下位置。可動域の下限(0°)で最上部、上限(サーブ側は180°、
+  // レシーブ側は120°)で最下部になるよう、可動域全体に対する連続な割合で決める。
+  // 以前はサーブ側だけopenFrac(backhandの0/1)に固定していたため、②ピッチ角を
+  // 90°より上(180側)に動かしても、90°より下(0側)へ動かした時と全く同じ見た目
+  // (円柱の傾きだけが変わり、ハイライト位置は動かない)になってしまい、どちら向きに
+  // 傾けているか見分けが付かなかった。tiltRaw自体に応じて連続的に動かすことで、
+  // 90°をまたいで上下どちらに傾けたかがハイライトの位置でも分かるようにする。
+  const highlightY = isServer
+    ? -20 + 34 * (clamp(tiltRaw, 0, 180) / 180)
+    : -20 + 34 * (clamp(tiltRaw, 0, 120) / 120);
+  const highlightR0 = lerp(3, 4, blackFrac);
+  // 黒面にも赤面と同じように光沢感(中心が明るく縁が暗い)を持たせる。
+  const blackStops = { 0: "#5a5a5a", mid: "#333333", 1: "#1c1c1c" };
+  const farStops = { 0: "#ff8fa0", mid: "#e8536a", 1: "#c62839" };
+  const rubberGrad = ctx.createRadialGradient(highlightX, highlightY, highlightR0, 0, 0, 30);
+  rubberGrad.addColorStop(0, lerpColorHex(farStops[0], blackStops[0], blackFrac));
+  rubberGrad.addColorStop(0.4, lerpColorHex(farStops.mid, blackStops.mid, blackFrac));
+  rubberGrad.addColorStop(1, lerpColorHex(farStops[1], blackStops[1], blackFrac));
+  ctx.fillStyle = rubberGrad;
+  ctx.fill();
+
+  ctx.restore(); // ブレード用の投影変換をここで終了
+
+  // ---- グリップ(柄)・手のひら：腕(肘)がある方向へ向かって伸びているように、
+  // ①②の潰れは掛けず、腕向きの回転(gripBaseAngleDeg)だけを使う。
+  // ロールは既にラケット位置自体を肘支点で回転させる形で織り込み済み
+  // （上のhandToElbowDeg算出を参照）なので、ここで改めてrollRawを足すと
+  // 二重に回転してしまう。面(ブレード)側だけ、こする動きをはっきり見せる目的で
+  // 別途rollRawをそのまま使う。
+  ctx.save();
+  ctx.rotate(deg2rad(gripBaseAngleDeg));
+
+  if (racket.selected) {
+    ctx.beginPath();
+    ctx.arc(0, 0, 46, 0, Math.PI * 2);
+    ctx.strokeStyle = "#ffd84d";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
+  // グリップ（柄）：先端に向かって広がる「フレア型」の形状
+  ctx.beginPath();
+  ctx.moveTo(-6, 24);
+  ctx.lineTo(-6.5, 40);
+  ctx.quadraticCurveTo(-11, 52, -9, 60);
+  ctx.quadraticCurveTo(-4, 64, 0, 64);
+  ctx.quadraticCurveTo(4, 64, 9, 60);
+  ctx.quadraticCurveTo(11, 52, 6.5, 40);
+  ctx.lineTo(6, 24);
+  ctx.closePath();
+  ctx.fillStyle = "#6b4226";
+  ctx.fill();
+  ctx.strokeStyle = "#4a2c17";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.strokeStyle = "#4a2c17";
+  ctx.lineWidth = 1;
+  [30, 37, 44, 51].forEach(gy => {
+    const half = 6 + (gy - 24) * 0.06;
+    ctx.beginPath();
+    ctx.moveTo(-half, gy);
+    ctx.lineTo(half, gy);
+    ctx.stroke();
+  });
+
+  // 手のひら／手の甲：ブレードには重ねず、グリップ(柄)の上に握っているように見せる。
+  // 実際のシェークハンドグリップは、バック(手の甲がサーバー側を向く)とフォア(その逆＝
+  // 手の甲が自分の体側を向く)で手首の向きが逆になる。レシーバー目線のこのカメラからは、
+  // フォア(甲が自分側＝カメラ側を向く)は手の甲(ナックル)側、バック(甲がサーバー側＝
+  // カメラと逆側を向く)は手のひら側が見えることになる。blackFrac(0=フォア/赤面〜
+  // 1=バック/黒面、②の色ブレンドと同じ値)で、この2つの見た目を連続的にブレンドする
+  // ことで、①②を動かした時にフォア/バックの切り替わりが手元でもはっきり分かるようにする。
+  ctx.fillStyle = lerpColorHex("#eab892", "#e3b492", blackFrac); // 甲側はやや張りのある明るめの色
+  ctx.beginPath();
+  ctx.ellipse(0, 38, 12, 15, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#c99a72";
+  ctx.lineWidth = 1;
+
+  // 手のひら側：指の付け根の折れ線（バック=blackFrac→1に近いほどはっきり見える）
+  ctx.globalAlpha = blackFrac;
+  [28, 33, 43].forEach(fy => {
+    ctx.beginPath();
+    ctx.moveTo(-10, fy);
+    ctx.lineTo(10, fy);
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+
+  // 手の甲側：指の付け根のナックル(関節)の丸み（フォア=blackFrac→0に近いほどはっきり見える）
+  ctx.globalAlpha = 1 - blackFrac;
+  ctx.fillStyle = "#f3c9a4";
+  [-6, -2, 2, 6].forEach(kx => {
+    ctx.beginPath();
+    ctx.ellipse(kx, 30, 2.6, 3.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.strokeStyle = "#c99a72";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(-9, 41);
+  ctx.quadraticCurveTo(0, 45, 9, 41); // 手首寄りの腱の膨らみ
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  ctx.restore(); // グリップ用の回転をここで終了
+
+  ctx.restore(); // ここでラケットの平行移動・回転がすべて元に戻る（以降は絶対座標系）
+
+  // 腕(前腕)は、ラケットより手前(前面)に見えるよう、ラケットを描き終えた後に描く。
+  // 腕をhandPos(ラケット中心=ブレード側)までそのまま伸ばすと、グリップ全体・
+  // ブレード手前まで腕が覆ってしまい、実際より腕が長く見えてしまう
+  // （手首の位置を通り越してラケット側まで腕に見えてしまう）。
+  // 腕は「手首」までで止め、そこから先(グリップ〜ブレード)はラケット側の見た目に
+  // 任せたいので、handPosから肘方向へグリップの見た目の長さ分だけ戻した位置を
+  // 腕の終点にする。
+  const WRIST_LEN = 64; // px（グリップのローカル座標の長さ(y=64)に合わせる。scaleに応じて伸縮）
+  const handToElbowRad = deg2rad(handToElbowDeg);
+  const wristPullBack = Math.min(WRIST_LEN * handPos.scale, elbowToHandDist * 0.9);
+  const wristPos = {
+    x: handPos.x + Math.cos(handToElbowRad) * wristPullBack,
+    y: handPos.y + Math.sin(handToElbowRad) * wristPullBack
+  };
+
+  const armGrad = ctx.createLinearGradient(shoulder.x, shoulder.y, wristPos.x, wristPos.y);
+  armGrad.addColorStop(0, isServer ? "#e3b492" : "#5a6b7d");
+  armGrad.addColorStop(1, "#e3b492");
+  ctx.strokeStyle = armGrad;
+  ctx.lineWidth = 10 * handPos.scale;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.beginPath();
+  ctx.moveTo(shoulder.x, shoulder.y);
+  ctx.lineTo(elbow.x, elbow.y);
+  ctx.lineTo(wristPos.x, wristPos.y);
+  ctx.stroke();
+
+  ctx.fillStyle = "#334155";
+  ctx.beginPath();
+  ctx.arc(elbow.x, elbow.y, 6 * handPos.scale, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// サーブ側など、ボールとの前後関係を部品ごとに分ける必要が無い場合にまとめて呼ぶ
+// ショートカット（drawRacketBase→drawRacketBladeAndArmの順で描くだけ）。
+function drawArmAndRacket(racket) {
+  drawRacketBase(racket);
+  drawRacketBladeAndArm(racket);
+}
+
+function drawTrail() {
+  if (ball.trail.length < 2) return;
+
+  // ラケット本体はcomputeRacketGeometry()内でRACKET_VISUAL_FORWARD_OFFSET_M分だけ
+  // 奥行き方向(net側)へ前に出して描いている一方、trailの実データ(ball.trail、物理演算
+  // そのまま)はその前出し分を含まない。そのため、打った直後の数点(ボールがまだ前出し量
+  // 分だけ進んでいない間)はラケットの見た目より後ろにあることになり、カメラ角度が90°
+  // (真横)に近いほどこのズレが画面上の横方向のズレとして目立ってしまう(computeRacketGeometry()
+  // 内のRACKET_VISUAL_FORWARD_OFFSET_Mのコメントも参照)。実データは変えず、描画時だけ
+  // 「打った瞬間の位置から前出し量に届くまで」の区間を前出し量の位置に固定して描くことで、
+  // 線が常にラケットの見た目より前から始まって見えるようにする(ボールが前出し量を超えて
+  // 進んだ後は、そのまま実際の位置で描かれる)。
+  const startRacket = ball.shotNumber % 2 === 1 ? serverRacket : receiverRacket;
+  const sign = startRacket.forwardSign;
+  const hitY = ball.trail[0].y;
+  const frontY = hitY + sign * RACKET_VISUAL_FORWARD_OFFSET_M;
+
+  ctx.beginPath();
+  ball.trail.forEach((point, index) => {
+    const y = (point.y - frontY) * sign < 0 ? frontY : point.y;
+    const pos = worldToPixel(point.x, y, point.z);
+    if (index === 0) ctx.moveTo(pos.x, pos.y);
+    else ctx.lineTo(pos.x, pos.y);
+  });
+
+  ctx.strokeStyle = "rgba(255, 216, 77, 0.7)";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+}
+
+function drawBall() {
+  const shadowPos = worldToPixel(ball.pos.x, ball.pos.y, 0);
+  const ballPos = worldToPixel(ball.pos.x, ball.pos.y, ball.pos.z);
+  const r = BALL_RADIUS_PX * ballPos.scale;
+
+  ctx.beginPath();
+  ctx.ellipse(shadowPos.x, shadowPos.y, r * 0.9, r * 0.4, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(ballPos.x, ballPos.y, r, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.strokeStyle = "#bbb";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // ボール表面に実際の回転角(spinPhase)で動く小さな点を置き、上/下回転・横回転それぞれの
+  // 回転方向がそのまま「回っている動き」として見えるようにする（値を読むだけでなく実感できる）。
+  // 回転が速いほど残像(尾)を長く伸ばし、速さの違いが一目で分かるようにする。
+  // こする量0などでスピンが実質ゼロ(ナックル)のときは、静止した点が誤って
+  // 「模様」に見えてしまわないよう、そもそも点を描かない。
+  const SPIN_MARKER_THRESHOLD = 8; // rad/s (約1.3回転/秒) 未満は無回転として扱う
+  if (Math.abs(ball.spin.x) > SPIN_MARKER_THRESHOLD) {
+    drawSpinMarker(ballPos, r, ball.spinPhase.x, ball.spin.x, 0, "#2a2a2a"); // 縦(上下)回転：縦方向に周回
+  }
+  if (Math.abs(ball.spin.z) > SPIN_MARKER_THRESHOLD) {
+    drawSpinMarker(ballPos, r, ball.spinPhase.z, ball.spin.z, 1, "#8a2be2"); // 横回転：横方向に周回
+  }
+
+  const spin = decomposeSpin(ball);
+  if (Math.abs(spin.total) > 0.3) {
+    ctx.beginPath();
+    ctx.arc(ballPos.x, ballPos.y, r + 4, 0, Math.PI * 1.5);
+    ctx.strokeStyle = "#ffd84d";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+}
+
+// axis=0: 縦方向に周回(上/下回転), axis=1: 横方向に周回(横回転)。
+// 本体に加えて、回転の速さに応じた長さの残像(尾)を付ける＝回転が速いほど尾が長く伸びて見える
+// (実際のモーションブラーと同じ考え方：一定時間に進んだ角度が大きいほど尾が伸びる)。
+function drawSpinMarker(ballPos, r, phase, spinRate, axis, color) {
+  drawSpinDot(ballPos, r, phase, axis, color, 1);
+
+  const trailSteps = 4;
+  const stepAngle = clamp(Math.abs(spinRate) * 0.012, 0, 0.5); // 1ステップ ≈ 12ms前の位置
+  if (stepAngle < 0.01) return; // ほぼ無回転なら尾は出さない
+  const dir = spinRate >= 0 ? 1 : -1;
+  for (let i = 1; i <= trailSteps; i++) {
+    const ghostPhase = phase - dir * stepAngle * i;
+    const alphaMul = 0.5 * (1 - i / (trailSteps + 1));
+    drawSpinDot(ballPos, r, ghostPhase, axis, color, alphaMul);
+  }
+}
+
+function drawSpinDot(ballPos, r, phase, axis, color, alphaMul) {
+  const depth = Math.cos(phase); // 手前(+1) 〜 奥(-1)
+  const along = Math.sin(phase) * r * 0.78;
+  const mx = axis === 1 ? ballPos.x + along : ballPos.x;
+  const my = axis === 0 ? ballPos.y - along : ballPos.y;
+  const near = 0.5 + 0.5 * depth; // 0(奥)〜1(手前)
+  const size = r * (0.14 + 0.13 * near);
+
+  ctx.globalAlpha = (0.35 + 0.5 * near) * alphaMul;
+  ctx.beginPath();
+  ctx.arc(mx, my, size, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+
+// ============================================================
+// アクション関数
+// ============================================================
+
+function syncServerRacketFromUI() {
+  const s = getServeSettings();
+  applySettingsToRacket(serverRacket, s);
+  serverRacket.backhand = s.backhand;
+  // 長さの値(0〜100)を0.3〜3.1倍の威力倍率に変換する。
+  serverRacket.powerMultiplier = 0.3 + (s.length / 50) * 0.7;
+  serverRacket.pos = { x: s.posX, y: s.depth, z: s.height };
+  serverRacket.activeShotNumber = 1;
+}
+
+// レシーバー側もページ読み込み直後からHTMLの初期値と実際のラケット状態がズレないようにする
+// （スライダーを一度も触らなくても、表示されている数値通りに動くように）
+function syncReceiverRacketFromUI() {
+  const s = getReturnSettings();
+  applySettingsToRacket(receiverRacket, s);
+  receiverRacket.backhand = s.backhand;
+  receiverRacket.pos = { x: s.posX, y: s.depth, z: s.height };
+  receiverRacket.activeShotNumber = 2;
+}
+
+// n球目を打つ。1球目(サーブ)・2球目(レシーブ)は元の serve()/receive() と同じ専用の挙動、
+// 3球目以降は共通の汎用処理（面の設定を切り替えて打つだけ。位置は自動追従で既に
+// ボール付近にいるので、サーブのように位置を指定し直すことはしない）。
+function playShot(n) {
+  const side = n % 2 === 1 ? "server" : "receiver";
+  const racket = side === "server" ? serverRacket : receiverRacket;
+
+  if (n === 1) {
+    syncServerRacketFromUI();
+
+    // 前のラリーで3球目以降を試していると、レシーブ側の面の向き・構える位置などが
+    // その時の設定のまま残っている可能性があるので、新しいラリーの開始時に
+    // レシーブ側も2球目の設定(現在のパラメータ)へ戻しておく。
+    syncReceiverRacketFromUI();
+    receiverRacket.leftHanded = document.getElementById("receiveLeftHanded")?.checked || false;
+    // レシーブ側の腕も、前のラリーのフォロースルー姿勢のまま残さず構えに戻す。
+    receiverRacket.swingProgress = null;
+
+    // ③ロール角によるラケット(ラバー)の見た目上の位置ズレは、effectiveRacketPos()で
+    // 近似済み(isNearRacketの当たり判定と同じ基準)。弾道(trail)の起点もそこに合わせ、
+    // ロールで動いた先のラバー中心から打ち出されたように見せる。
+    ball.pos = effectiveRacketPos(serverRacket);
+    // トスを16cm以上投げ上げてから落ちてきたところを打つ、という実際のサーブ動作を反映し、
+    // ボールは静止状態ではなく「トスの落下速度」を持った状態でラケットに当たる
+    ball.vel = { x: 0, y: 0, z: -PHYS.SERVE_TOSS_SPEED };
+    ball.spin = { x: 0, y: 0, z: 0 };
+    ball.bouncedOwnSide = false;
+
+    Physics.racketImpact(ball, serverRacket);
+    ball.moving = true;
+  } else {
+    if (n >= 3) {
+      // 3球目以降は動的に追加された設定欄の値を、打つ直前にラケットへ反映する
+      // （常時バインドしていないのは、2球目までと違って画面に「今の設定通りの構え」を
+      // 常に見せ続ける対象ではないため）。
+      const s = getShotSettings(n);
+      applySettingsToRacket(racket, s);
+      racket.backhand = s.backhand;
+      racket.powerMultiplier = 1;
+      racket.activeShotNumber = n;
+    }
+    // 実際にはRACKET_HIT_RADIUS(0.15m)以内に入った時点でヒット判定されるため、
+    // ボールの物理位置はラケットの中心からズレていることが多い。見た目上は毎回
+    // ラバーの中心で打ったように見せたいので、当たる瞬間だけ位置をラケットの
+    // 位置へ合わせる（racketImpact()は速度・回転の計算にball.posを使わないため、
+    // 弾道や回転など実際の物理的な結果には影響しない）。
+    // ③ロール角による見た目上のズレのうち、高さ(Z)方向はボールが元々飛んできた
+    // 軌道の延長線上に収まるため、そのまま合わせても違和感が出にくい。一方
+    // 左右(X)方向はボールが元々動いていなかった向きなので、フルに合わせると
+    // 「打った瞬間に急に横へ引っ張られる(吸い付く)」ように見えてしまう。
+    // なお、左右方向はracket.pos.xをそのまま使っても同じズレが起きる
+    // (自動追従がロール分を打ち消すため、racket.pos.x自体がボールのx位置から
+    // 意図的にずらされている)。そのため左右(X)はボール自身の現在位置をそのまま
+    // 保持し(=左右方向のスナップをしない)、高さ(Z)だけロール後のラバー中心に合わせる。
+    const rollOffset = rollPivotOffset(racket);
+    ball.pos = { x: ball.pos.x, y: racket.pos.y, z: racket.pos.z + rollOffset.z };
+    Physics.racketImpact(ball, racket);
+  }
+
+  ball.phase = side === "server" ? "serve" : "return";
+  ball.shotNumber = n;
+  ball.bounceCount = 0; // 直近の打球以降のバウンドを新しく数え直す（着地点を見るのが目的のため）
+  ball.bouncedTargetSide = false;
+  ball.netTouched = false;
+  ball.trail = [];
+  landingMarker = null;
+  setShotInfo("");
+
+  triggerSwing(racket);
+  updateSpinText(ball);
+  setStatus(
+    n === 1 ? "サーブを打ちました！" :
+    n === 2 ? "レシーブで返球！" :
+    `${n}球目を打ちました！`
+  );
+
+  // 打った瞬間、その側(側の設定パネル)の表示を今打ったn球目へ自動的に切り替える。
+  // fillPanelFromData()は表示欄に値を書き込むだけ(applyLiveIfCurrentのような
+  // ラケットへの反映は行わない)ので、ここで呼んでも直前に適用した実際の打球結果に
+  // 影響しない。
+  switchPanelToShot(side, n);
+}
+
+// side側のパネルを、指定した球番号(n)の表示に切り替える(select選択・入力欄の値を
+// n球目のshotDataに合わせる)。既に同じ球を表示中なら何もしない。
+function switchPanelToShot(side, n) {
+  if (currentShotNumber[side] === n) return;
+  currentShotNumber[side] = n;
+  refreshShotSelect(side);
+  fillPanelFromData(side);
+}
+
+function serve() {
+  playShot(1);
+}
+
+function endRally(message) {
+  setStatus(message);
+  // ボールは今の位置(着地点)のまま止め、次のサーブが始まるまで表示し続ける。
+  ball.moving = false;
+}
+
+
+// ============================================================
+// 物理更新ループ（固定ステップで積分し、衝突判定を行う）
+// ============================================================
+
+// ③ロール角は、見た目(computeRacketGeometryのhandPos)では肘を支点に回転させて
+// 高さ・左右位置も動かしているが、そのままだと当たり判定は常に元のracket.posのままになり、
+// 画面上ではラケットが大きく動いているのに判定だけは動いていない、という不一致が起きる。
+// ヒット判定の基準位置にも同じ幾何(肘オフセット0.281m・ワールドY軸まわりの回転)を
+// 反映し、見た目と当たり判定をぴったり一致させる。
+//
+// 半径をcomputeRacketGeometry()と同じ0.281mにすると、自動追従(updateSideTracking)が
+// ロール分の位置ズレを打ち消すために左右(X)へも大きく動く必要が生じる。以前は
+// 奥行き(Y)方向の追従とX方向の追従を1本の合成ベクトルとして同じ速度予算で動かして
+// いたため、X方向に大きく動く分だけY方向(＝ボールを追いかけて間に合わせる方向)の
+// 実効速度が目減りし、「ボールが奥へ抜けていく間に合わせられず、ラリーが途中で
+// 止まる」不具合が起きた(実機で確認済み)。X/Yを下のupdateSideTracking側でそれぞれ
+// 独立した速度予算で動かすように直したことで、この目減りが無くなり、0.281mのままで
+// 自動追従も破綻しないことを確認している。
+//
+// このオフセット(x,z)は、updateSideTracking()が自動追従の目標位置(racket.pos)を
+// 実際のボール位置から逆算する時にも使う(effectiveRacketPos(racket) = racket.pos +
+// offsetなので、racket.posをball.pos - offsetへ追従させればeffectiveRacketPosが
+// ちょうどball.posに一致する)。
+function rollPivotOffset(racket) {
+  const rollRad = deg2rad(racket.rollAngle || 0);
+  const ELBOW_TO_HAND_M = 0.281; // computeRacketGeometry()の肘オフセットと同じ値
+  // mirrorX: フォア/バック・利き手による左右反転。computeRacketGeometryのmirrorXと同じ式。
+  const mirrorX = (racket.backhand ? -1 : 1) * (racket.leftHanded ? -1 : 1);
+  return {
+    x: ELBOW_TO_HAND_M * mirrorX * (1 - Math.cos(rollRad)),
+    z: ELBOW_TO_HAND_M * Math.sin(rollRad)
+  };
+}
+
+function effectiveRacketPos(racket) {
+  const offset = rollPivotOffset(racket);
+  return {
+    x: racket.pos.x + offset.x,
+    y: racket.pos.y,
+    z: racket.pos.z + offset.z
+  };
+}
+
+function isNearRacket(ball, racket) {
+  const p = effectiveRacketPos(racket);
+  const dx = ball.pos.x - p.x;
+  const dy = ball.pos.y - p.y;
+  const dz = ball.pos.z - p.z;
+  const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  return dist < PHYS.RACKET_HIT_RADIUS && ball.pos.z > 0.02 && ball.pos.z < 0.6;
+}
+
+const BOUNCE_STOP_SPEED = 0.25;    // m/s 未満ならボールは実質止まったとみなす
+const MAX_UNRETURNED_BOUNCES = 15; // 安全装置：これ以上バウンドが続いたら強制的に終わらせる（回転でゆっくり戻る場合にも猶予を持たせる）
+
+function recordBounce() {
+  landingMarker = { x: ball.pos.x, y: ball.pos.y };
+  setShotInfo("バウンド地点: " + describeBounce(ball.pos.x, ball.pos.y));
+
+  const n = ball.shotNumber;
+  // 今飛んでいるボールが向かうべき側（奇数球=サーブ側が打った→レシーブ側、
+  // 偶数球=レシーブ側が打った→サーブ側）で一度でも跳ねたかを共通で使う。
+  const onTargetSide = ball.phase === "serve" ? (ball.pos.y > PHYS.NET_Y) : (ball.pos.y < PHYS.NET_Y);
+
+  if (n === 1) {
+    if (ball.bounceCount === 1) {
+      ball.bouncedOwnSide = !onTargetSide;
+      // フォルト(自陣バウンドを飛ばして直接相手コート側でバウンド)でも、レシーバーが
+      // 反応してよいタイミングとしては相手コート側でのバウンドと同じ扱いにする。
+      if (onTargetSide) ball.bouncedTargetSide = true;
+      if (!ball.netTouched) {
+        if (ball.bouncedOwnSide) {
+          setStatus("バウンド。ネットへ向かいます");
+        } else {
+          setStatus("サーブフォルト（バウンドしていません）");
+        }
+      }
+      return;
+    }
+
+    if (onTargetSide) ball.bouncedTargetSide = true;
+    const speed = Vec3.length(ball.vel);
+
+    if (ball.bounceCount === 2) {
+      if (!onTargetSide) {
+        // ネットまで届かず自陣で連続バウンドした（サーブが弱すぎる）
+        endRally("サーブが弱く、相手コートに届きませんでした");
+      } else if (!ball.netTouched) {
+        // 実際の卓球と同じく、相手コートで1回バウンドするのを見てから打ち返す
+        setStatus("相手コートでバウンド。レシーブのタイミングです");
+      }
+      return;
+    }
+
+    // ここに来るのは、一度は相手コートまで届いた後の3バウンド目以降
+    if (!onTargetSide) {
+      // 強い回転(下回転など)でボールが自陣側へ押し戻された。実際の卓球でも起こる現象なので、
+      // 打ち切らずに最後まで様子を見せる。
+      if (speed < BOUNCE_STOP_SPEED) {
+        endRally("強烈な回転でボールが自陣に押し戻され、止まりました！");
+      } else if (!ball.netTouched) {
+        setStatus("回転の影響でボールが自陣側へ戻ってきています！");
+      }
+      return;
+    }
+
+    if (speed < BOUNCE_STOP_SPEED) {
+      endRally("レシーブが間に合わず、ボールが止まりました");
+    } else if (ball.bounceCount >= MAX_UNRETURNED_BOUNCES) {
+      endRally("レシーブが間に合いませんでした");
+    } else if (!ball.netTouched) {
+      setStatus(`相手コートで${ball.bounceCount}バウンド目です`);
+    }
+    return;
+  }
+
+  // 2球目以降は共通のロジック: ネットを越えて相手側で1回跳ねればそのタイミングで
+  // 次の球を打ってよい。越えられず、打った側で連続バウンドしたら失敗として終了する。
+  // 次の球が設定されていない(最後の球)場合も明示的には終了させず、そのまま物理演算に
+  // 任せて、ボールが場外に出る/止まるまで様子を見せる。
+  if (ball.bounceCount === 1) {
+    if (onTargetSide) {
+      ball.bouncedTargetSide = true;
+      if (!ball.netTouched) {
+        setStatus(n < totalShots
+          ? `${n}球目がバウンドしました。${n + 1}球目のタイミングです`
+          : `${n}球目がバウンドしました。着地点をチェック！`);
+      }
+    } else if (!ball.netTouched) {
+      setStatus(`${n}球目がネットを越えられず、バウンドしました`);
+    }
+  } else if (ball.bounceCount >= 2 && !onTargetSide) {
+    endRally(`${n}球目がミス（ネットを越えられず連続バウンドしました）`);
+  }
+}
+
+// サーブ側・レシーブ側とも、自分でドラッグして操作していない間は、実際のプレイヤーの
+// ように飛んできたボールへ自動的に反応して動く（固定位置のままだと現実的に取れないため）。
+// 元は「レシーブ側が2球目を取りに行く」専用のロジックだったが、3球目以降でサーブ側・
+// レシーブ側どちらが打つ場合にも使えるよう、sideを引数にとる形へ一般化した。
+const RECEIVER_REACTION_SPEED = 3.5; // m/s 相当の反応の速さ(X/Y用。実際のボールを追いかける時。ヒット判定の信頼性に関わるため変えない)
+const REPOSITION_SPEED = RECEIVER_REACTION_SPEED / 2; // ボールを追いかけていない時(次の構える位置へ戻る/移動する時)のX/Yの速さ。半分くらいゆっくりにする。
+const RECEIVER_Z_REACTION_SPEED = 3.5; // m/s 相当の反応の速さ(高さ専用)
+
+// この側(side)が次にどの球を打つかを求める。今飛んでいるボール(ball.shotNumber)の
+// 直後がこの側の球ならその番号を、間に相手の一球を挟んだ次がこの側の球ならその番号を
+// 返す。どちらも設定されていなければ（このラリーではもう出番が無ければ）nullを返す。
+function nextShotForSide(side) {
+  const s1 = ball.shotNumber + 1;
+  if (s1 <= totalShots && shotSide(s1) === side) return s1;
+  const s2 = ball.shotNumber + 2;
+  if (s2 <= totalShots && shotSide(s2) === side) return s2;
+  return null;
+}
+
+function updateSideTracking(dt, side) {
+  const racket = side === "server" ? serverRacket : receiverRacket;
+  if (racket.selected) return;
+  if (!ball.moving) return;
+
+  const upcoming = nextShotForSide(side);
+  if (upcoming === null) return; // このラリーではもう出番が無い
+
+  // 今飛んでいるボールが実際にこちら(side)へ向かっていて(サーブ=サーブ側→レシーブ側、
+  // return=レシーブ側→サーブ側)、既に相手コート側でのバウンドを終えている
+  // （＝実際に触りに行ってよいタイミング。サーブフォルトで自陣バウンドを飛ばした
+  // 場合も、相手コート側でのバウンド自体は起きているので反応してよい）時だけ、
+  // 実際のボール位置を追いかける。それ以外の間は、次に自分が打つ球の「構える位置」で
+  // 待機する（以前は前の球を打った場所に留まったままだったが、待機位置として
+  // 明示的に設定できるようにする）。
+  const isImmediateNext = upcoming === ball.shotNumber + 1;
+  const s = getShotSettings(upcoming);
+
+  // 直前の球(相手側)が実際に打たれた後は、まだ自分の番が来る前(実際にボールを取りに
+  // 行く前)でも、次に自分が打つ球の面の向き(①〜⑥・バック面)を早めに反映しておく。
+  // 「相手がラケットに触った瞬間」＝直前の球が打たれた瞬間を目安にする(isImmediateNext
+  // が真になるのはちょうどそのタイミング)。以前は実際に打つ直前まで反映されず、
+  // 傾ける動きが遅く見えていた。
+  if (isImmediateNext) {
+    applySettingsToRacket(racket, s);
+    racket.backhand = s.backhand;
+    racket.activeShotNumber = upcoming;
+  }
+
+  // 「打点を遅らせる時間」の分だけ、相手コート側でのバウンドから実際に追いかけ始める
+  // までを遅らせる。ボールの位置そのものをずらす方式だと、台の上で何度もバウンドする
+  // 関係で「1バウンド分だけ丸ごと遅れる/遅れない」という飛び飛びの変化になってしまう
+  // ため、時間で遅らせることで連続的に調整できるようにしている。
+  const incoming = side === "receiver" ? ball.phase === "serve" : ball.phase === "return";
+  const chaseRealBall = isImmediateNext && incoming && ball.bouncedTargetSide
+    && ball.bouncedTargetSideTime >= s.delaySec;
+
+  let targetX, targetY, targetZ;
+  if (chaseRealBall) {
+    targetX = ball.pos.x;
+    targetY = ball.pos.y;
+    targetZ = ball.pos.z;
+  } else {
+    targetX = s.posX;
+    targetY = s.depth;
+    targetZ = s.height;
+  }
+
+  const yRange = side === "receiver"
+    ? [PHYS.NET_Y + 0.05, PHYS.TABLE_LENGTH + 0.4]
+    : [-0.4, PHYS.NET_Y - 0.05];
+  // この時点のtargetX/Y/Zは「実際に手を伸ばして届くべき、妥当な範囲の位置」を表す
+  // (ボールを追いかけている時はボールの実位置、そうでない時は構える位置)。ここで
+  // clampして妥当な範囲に収める。
+  targetX = clamp(targetX, -PHYS.TABLE_WIDTH / 2 - 0.3, PHYS.TABLE_WIDTH / 2 + 0.3);
+  targetY = clamp(targetY, yRange[0], yRange[1]);
+  targetZ = clamp(targetZ, 0.05, 0.7);
+
+  // ヒット判定はracket.posそのものではなくeffectiveRacketPos(racket)
+  // (=racket.pos + ③ロール分のオフセット)で行われるため、racket.posをそのまま
+  // 上のtargetへ追従させると、ロール角が大きい時にeffectiveRacketPosだけ
+  // ボールから最大0.281mズレて判定半径(0.15m)に入らなくなる。あらかじめ
+  // オフセット分を逆に引いた位置をracket.posの目標にして、effectiveRacketPosが
+  // ちょうど上のtarget(妥当な範囲にclamp済みの位置)に一致するように追従させる。
+  // 重要：このオフセット差し引きは、上のclampより後に行う。先にclampしてしまうと
+  // (例えばtargetZの下限0.05mに対し③の最大オフセットが0.281mもあるため)、
+  // オフセット分を引いた瞬間に範囲外(マイナス)になる場合が多く、そこをもう一度
+  // clampし直すと差し引いた分がなかったことになり、ロール角を付けた途端に
+  // 自動追従が実際のボールへ届かなくなる(＝ラリーが続かなくなる)不具合になる。
+  // racket.pos自体はロール適用前の中間値なので、0.05〜0.7の外に出ても問題ない。
+  if (chaseRealBall) {
+    const offset = rollPivotOffset(racket);
+    targetX -= offset.x;
+    targetZ -= offset.z;
+  }
+
+  // 自分がちょうど今の球を打った直後で、まだ振り抜き(フォロースルー)アニメーションが
+  // 再生中(swingProgressが0〜1の途中)の間は、位置を動かさない。ここで動かしてしまうと、
+  // フォロースルーのポーズのままracket.posだけが次の構える位置へ向けて滑るように
+  // 動いてしまい、スイングの途中から不自然に移動し始めて見える。振り抜きが完全に
+  // 終わる(swingProgressが1に達する、またはまだ一度も振っていないnull)まで待ってから、
+  // ちょうどスイングが終わったタイミングで動き出すようにする。
+  const canReposition = racket.swingProgress === null
+    || (racket.swingProgress >= 1 && racket.swingHoldElapsed >= SWING_HOLD_BEFORE_RESET);
+  if (canReposition) {
+    const dx = targetX - racket.pos.x;
+    const dy = targetY - racket.pos.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 1e-4) {
+      // スイング(フォロースルー)が終わっていて、かつ実際に構える位置へ向けて動き出す
+      // 瞬間に、腕の見た目を振り抜いたまま(swingProgress===1)にせず、通常の構えの
+      // 角度へ戻す。振り抜きポーズのまま滑るように移動して見えるのを防ぐため。
+      if (racket.swingProgress !== null) racket.swingProgress = null;
+      // 実際のボールを追いかけている(chaseRealBall)時はヒット判定の信頼性のため
+      // 従来通りの速さのまま、構える位置へ戻るだけの時だけゆっくりにする。
+      const speed = chaseRealBall ? RECEIVER_REACTION_SPEED : REPOSITION_SPEED;
+      // X/Yは合成距離(dist)ではなく、それぞれ独立に同じ速さで動かす。以前はdx/dyを
+      // 合成した1本のベクトルとして動かしていたため、③ロール分の左右(X)オフセットを
+      // 追いかける分だけ、ボールを深追いする奥行き(Y)方向の速さが目減りしてしまい
+      // (速さの予算をX/Yで奪い合う形になる)、ボールが自分の手前を通り過ぎるまでに
+      // 追いつけずラリーが途切れる原因になっていた。X/Yを独立に動かせば、③の
+      // オフセットを追いかけていても奥行き方向の追従速度は削られない。
+      const xStep = Math.min(Math.abs(dx), speed * dt);
+      racket.pos.x += Math.sign(dx) * xStep;
+      const yStep = Math.min(Math.abs(dy), speed * dt);
+      racket.pos.y += Math.sign(dy) * yStep;
+    }
+
+    // 高さ(Z)は、X/Yとは独立に高さ専用の反応速度で追従させる
+    // （isNearRacket()の判定半径(0.15m)を、高さのズレだけですり抜けないようにする）。
+    const dz = targetZ - racket.pos.z;
+    const zStep = Math.min(Math.abs(dz), RECEIVER_Z_REACTION_SPEED * dt);
+    racket.pos.z += Math.sign(dz) * zStep;
+  }
+}
+
+function stepPhysics(dt) {
+  if (!ball.moving) return;
+
+  // bouncedTargetSideが真になっている間、そこからの経過時間を計測する
+  // （「打点を遅らせる時間」の判定に使う。falseに戻ったら自動的に0に戻る）。
+  ball.bouncedTargetSideTime = ball.bouncedTargetSide ? ball.bouncedTargetSideTime + dt : 0;
+
+  updateSideTracking(dt, "receiver");
+  updateSideTracking(dt, "server");
+
+  const prevY = ball.pos.y;
+  Physics.integrateFlight(ball, dt);
+
+  if (Physics.crossesNet(prevY, ball.pos.y) && ball.pos.z - PHYS.BALL_RADIUS < PHYS.NET_HEIGHT) {
+    // ネットの高さより低い位置でネットの奥行き位置をまたいだ＝ネット本体に当たった
+    // とみなす。以前は速度だけを弱めて位置はそのまま(＝既にネットの奥へ進んだ位置)
+    // にしていたため、毎フレームわずかずつ前進を続けてネットをすり抜けたように
+    // 相手コートへ着地してしまっていた。現実のネットに掛かったボールと同じ見た目に
+    // なるよう、位置をネットの手前(打った側＝このステップの直前の位置)へ押し戻し、
+    // 勢いもほぼ吸収した上でわずかに逆方向へ押し返す。以降は重力に任せることで、
+    // ネットの手前(自陣寄り)へほぼ真下に落ちる。
+    ball.pos.y = prevY;
+    ball.vel.x *= 0.1;
+    ball.vel.y *= -0.1;
+    ball.netTouched = true;
+    setStatus("ネットにかかりました！");
+  }
+
+  if (ball.pos.z <= PHYS.BALL_RADIUS && ball.vel.z < 0) {
+    const onTable =
+      Math.abs(ball.pos.x) <= PHYS.TABLE_WIDTH / 2 + 0.02 &&
+      ball.pos.y >= -0.02 && ball.pos.y <= PHYS.TABLE_LENGTH + 0.02;
+
+    if (onTable) {
+      Physics.tableBounce(ball);
+      recordBounce();
+      if (!ball.moving) return; // recordBounce()内でラリーが終了した場合はここで打ち切る
+    } else {
+      endRally("アウト！");
+      return;
+    }
+  }
+
+  ball.trail.push({ x: ball.pos.x, y: ball.pos.y, z: ball.pos.z });
+  if (ball.trail.length > 50) ball.trail.shift();
+
+  // 相手コートで1回バウンドするまでは、次に打つ側はまだ手を出さない（実際の卓球と同じ
+  // タイミング）。サーブフォルトで自陣バウンドを飛ばした場合も、相手コート側でのバウンドは
+  // 起きているので同様に手を出せるようにする（bounceCountの絶対値ではなく、相手コート側での
+  // バウンドが実際に起きたかどうかで判定する）。次の球が設定されていなければ何も起きない
+  // （そのままボールは物理演算に任せて場外に出る/止まるまで動き続ける）。
+  const nextShot = ball.shotNumber + 1;
+  if (ball.bouncedTargetSide && nextShot <= totalShots) {
+    const nextRacket = nextShot % 2 === 1 ? serverRacket : receiverRacket;
+    if (isNearRacket(ball, nextRacket)) {
+      playShot(nextShot);
+      return;
+    }
+  }
+
+  if (
+    ball.pos.y < -1 || ball.pos.y > PHYS.TABLE_LENGTH + 1.5 ||
+    Math.abs(ball.pos.x) > PHYS.TABLE_WIDTH / 2 + 1.5 ||
+    ball.pos.z < -0.5
+  ) {
+    endRally("場外");
+  }
+}
+
+
+// ============================================================
+// イベントハンドラー（両ラケットとも クリックで選択 → ドラッグで移動できる）
+// ============================================================
+
+function setInputValue(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.value = String(Math.round(value));
+}
+
+// drawRacketBladeAndArm()内のfrontRim(ラバー面の前面リム)と同じ回転・疑似遠近スケールで、
+// リムの重心がhandPos(回転支点)からどれだけずれて見えるかを求める(ローカル・等倍単位)。
+// ②のようにラケットが傾いていると、疑似遠近スケール(projectのs)が円周上の位置ごとに
+// 変わるため、描かれる面の見た目の中心はhandPosちょうどにはならない。クリック判定を
+// 実際に見えているラバーの位置に合わせるために使う。
+function racketRubberCenterOffset(racket) {
+  const pitchRad = deg2rad(90 - (racket.tiltX !== undefined ? racket.tiltX : 90)) * racket.forwardSign;
+  // drawRacketBladeAndArm()と同じく、CAMERA_YAWをここにも掛けて、カメラ角度を
+  // 変えた時のクリック判定(見た目のラバー位置)を一致させる。①②③を全部適用した
+  // 最終的な向きに対する一番外側のZ軸回転として掛ける(③ロールより先に①ヨーへ
+  // 足し込むと、③ロールが0でない時だけ結果がずれるため)。
+  const yawRad = deg2rad(racket.angle || 0);
+  const rollRad = deg2rad(racket.rollAngle || 0);
+  const cameraYawRad = deg2rad(CAMERA_YAW);
+  const rotateFace = v => Vec3.rotateZ(Vec3.rotateY(Vec3.rotateZ(Vec3.rotateX(v, pitchRad), yawRad), rollRad), cameraYawRad);
+  const R_OUTER = 27, THICK = 4, segments = 28;
+  const DEPTH_SCALE = 0.01;
+  const project = p => {
+    const s = 1 + p.y * DEPTH_SCALE;
+    return { x: p.x * s, y: -p.z * s };
+  };
+  const topIsFront = rotateFace({ x: 0, y: THICK / 2, z: 0 }).y >= rotateFace({ x: 0, y: -THICK / 2, z: 0 }).y;
+  const frontLocalY = topIsFront ? THICK / 2 : -THICK / 2;
+  let sx = 0, sy = 0;
+  for (let i = 0; i < segments; i++) {
+    const a = (i / segments) * Math.PI * 2;
+    const p = project(rotateFace({ x: Math.cos(a) * R_OUTER, y: frontLocalY, z: Math.sin(a) * R_OUTER }));
+    sx += p.x;
+    sy += p.y;
+  }
+  return { x: sx / segments, y: sy / segments };
+}
+
+// 台の中心の表示位置ハンドルのクリック判定半径(px、内部解像度基準)。
+// click(つかむ/離す)とdblclick(中心に戻す)の両方で同じ当たり判定にする。
+const CENTER_HANDLE_HIT_RADIUS = 22;
+
+// canvas上のクリック/ダブルクリック座標を、内部解像度(900x600)の座標系に変換する。
+// canvasはCSS側でmax-width:100%により表示サイズが縮むことがあるため、
+// clientX/Y(CSS表示サイズ基準)をそのまま使うと判定がズレるため必要。
+function canvasEventToInternalXY(event) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (event.clientX - rect.left) * scaleX,
+    y: (event.clientY - rect.top) * scaleY
+  };
+}
+
+canvas.addEventListener("click", event => {
+  const { x: mouseX, y: mouseY } = canvasEventToInternalXY(event);
+
+  // 台の中心の表示位置ハンドルは、ラケットより優先してクリック判定する
+  // (通常はラケットから離れた台の中心付近にしか出ないため競合しにくい)。
+  // クリックのたびにつかむ/離すをトグルする、ラケット選択と同じ操作感。
+  const centerHandlePos = centerHandleScreenPos();
+  const distToCenterHandle = Math.hypot(mouseX - centerHandlePos.x, mouseY - centerHandlePos.y);
+  if (distToCenterHandle < CENTER_HANDLE_HIT_RADIUS) {
+    centerPanDragging = !centerPanDragging;
+    serverRacket.selected = false;
+    receiverRacket.selected = false;
+    return;
+  }
+  centerPanDragging = false;
+
+  // クリック判定は、実際に画面上でラバー面(ブレード)が描かれている位置を使う。
+  // computeRacketGeometry()のhandPos(回転支点)に、racketRubberCenterOffset()で求めた
+  // ラバー面の見た目の重心のズレ(ローカル単位なのでhandPos.scaleを掛ける)を足すことで、
+  // サーブ側・レシーブ側どちらでも実際に見えているラバーの位置と判定位置を一致させる。
+  const serverGeom = computeRacketGeometry(serverRacket);
+  const receiverGeom = computeRacketGeometry(receiverRacket);
+  const serverOffset = racketRubberCenterOffset(serverRacket);
+  const receiverOffset = racketRubberCenterOffset(receiverRacket);
+  const serverPos = {
+    x: serverGeom.handPos.x + serverOffset.x * serverGeom.handPos.scale,
+    y: serverGeom.handPos.y + serverOffset.y * serverGeom.handPos.scale
+  };
+  const receiverPos = {
+    x: receiverGeom.handPos.x + receiverOffset.x * receiverGeom.handPos.scale,
+    y: receiverGeom.handPos.y + receiverOffset.y * receiverGeom.handPos.scale
+  };
+  const distToServer = Math.hypot(mouseX - serverPos.x, mouseY - serverPos.y);
+  const distToReceiver = Math.hypot(mouseX - receiverPos.x, mouseY - receiverPos.y);
+
+  if (distToServer < 50 && distToServer <= distToReceiver) {
+    serverRacket.selected = !serverRacket.selected;
+    receiverRacket.selected = false;
+  } else if (distToReceiver < 50) {
+    receiverRacket.selected = !receiverRacket.selected;
+    serverRacket.selected = false;
+  } else {
+    serverRacket.selected = false;
+    receiverRacket.selected = false;
+  }
+});
+
+canvas.addEventListener("mousemove", event => {
+  if (!serverRacket.selected && !receiverRacket.selected && !centerPanDragging) return;
+  const { x: mouseX, y: mouseY } = canvasEventToInternalXY(event);
+
+  if (centerPanDragging) {
+    // centerHandleScreenPos()は現在のPAN_X/PAN_Yを含んだ座標を返すので、いったん
+    // 差し引いて「パン無しなら台の中心がどこに映るか」の基準位置を求め、そこから
+    // マウス位置までの差分を新しいPAN_X/PAN_Yにする(マウスの動きとハンドルの
+    // 見た目の動きが常に一致する)。
+    const current = centerHandleScreenPos();
+    const baseX = current.x - PAN_X;
+    const baseY = current.y - PAN_Y;
+    PAN_X = mouseX - baseX;
+    PAN_Y = mouseY - baseY;
+    return;
+  }
+
+  if (serverRacket.selected) {
+    const world = screenToWorld(mouseX, mouseY, serverRacket.pos.z, "server");
+    serverRacket.pos.x = world.x;
+    serverRacket.pos.y = world.y;
+    // ドラッグした位置を、今パネルで編集中の球(currentShotNumber.server)の
+    // 構える位置(左右位置・奥行き位置)へ書き戻す。以前はserveX/serveDepthという
+    // 廃止済みの専用id宛てにしか同期しておらず(固定パネル+select方式への移行で
+    // 実際には存在しないidになっていた)、パラメータ側に一切反映されていなかった。
+    const n = currentShotNumber.server;
+    shotData[n].posX = Math.round(world.x * 100);
+    shotData[n].depth = Math.round(world.y * 100);
+    setInputValue(SHOT_PANEL.server.fields.posX, shotData[n].posX);
+    setInputValue(SHOT_PANEL.server.fields.depth, shotData[n].depth);
+    if (!ball.moving && n === 1) ball.pos = { x: world.x, y: world.y, z: serverRacket.pos.z };
+  }
+
+  if (receiverRacket.selected) {
+    const world = screenToWorld(mouseX, mouseY, receiverRacket.pos.z, "receiver");
+    receiverRacket.pos.x = world.x;
+    receiverRacket.pos.y = world.y;
+    // サーブ側と同じく、ドラッグした位置を今パネルで編集中の球(currentShotNumber.receiver)
+    // の構える位置へ反映する。奥行きはgetShotSettings()と対称の変換
+    // (depth = TABLE_LENGTH - world.y、cmへ×100)で書き戻す。
+    const n = currentShotNumber.receiver;
+    shotData[n].posX = Math.round(world.x * 100);
+    shotData[n].depth = Math.round((PHYS.TABLE_LENGTH - world.y) * 100);
+    setInputValue(SHOT_PANEL.receiver.fields.posX, shotData[n].posX);
+    setInputValue(SHOT_PANEL.receiver.fields.depth, shotData[n].depth);
+  }
+});
+
+// 表示位置ハンドルをダブルクリックすると、PAN_X/PAN_Yを0に戻して中心位置へ即座に戻す
+// (ドラッグでずらした後、毎回ボタンまで手を伸ばさなくても素早く戻せるようにするため)。
+canvas.addEventListener("dblclick", event => {
+  const { x: mouseX, y: mouseY } = canvasEventToInternalXY(event);
+  const centerHandlePos = centerHandleScreenPos();
+  const distToCenterHandle = Math.hypot(mouseX - centerHandlePos.x, mouseY - centerHandlePos.y);
+  if (distToCenterHandle < CENTER_HANDLE_HIT_RADIUS) {
+    PAN_X = 0;
+    PAN_Y = 0;
+    centerPanDragging = false;
+  }
+});
+
+const bindCheckbox = (id, obj, prop) => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener("change", e => { obj[prop] = e.target.checked; });
+  }
+};
+bindCheckbox("serveLeftHanded", serverRacket, "leftHanded");
+bindCheckbox("receiveLeftHanded", receiverRacket, "leftHanded");
+
+// 再生速度：SLOW_MOTIONはracketのプロパティではないただのグローバル変数なので、
+// 専用のリスナーで直接更新する
+const playbackSpeedInput = document.getElementById("playbackSpeed");
+if (playbackSpeedInput) {
+  // ページを開いた直後から、表示値がSLOW_MOTION(実際に使われる再生速度)と
+  // 一致するよう、SLOW_MOTIONを基準にして表示値を合わせておく。
+  playbackSpeedInput.value = SLOW_MOTION;
+  playbackSpeedInput.addEventListener("input", e => {
+    SLOW_MOTION = Number(e.target.value);
+  });
+}
+
+// 表示倍率：VIEW_ZOOMもグローバル変数なので、同じく専用のリスナーで直接更新する。
+const viewZoomInput = document.getElementById("viewZoom");
+if (viewZoomInput) {
+  viewZoomInput.value = VIEW_ZOOM;
+  viewZoomInput.addEventListener("input", e => {
+    VIEW_ZOOM = Number(e.target.value);
+  });
+}
+
+// 表示位置リセット：台の中心のドラッグハンドルで動かしたPAN_X/PAN_Yを0に戻す。
+const panResetButton = document.getElementById("panResetButton");
+if (panResetButton) {
+  panResetButton.addEventListener("click", () => {
+    PAN_X = 0;
+    PAN_Y = 0;
+    centerPanDragging = false;
+  });
+}
+
+// カメラ角度：CAMERA_YAWもグローバル変数なので、同じく専用のリスナーで直接更新する。
+const cameraYawInput = document.getElementById("cameraYaw");
+const cameraYawValue = document.getElementById("cameraYawValue");
+if (cameraYawInput) {
+  cameraYawInput.value = CAMERA_YAW;
+  if (cameraYawValue) cameraYawValue.textContent = `${CAMERA_YAW}°`;
+  cameraYawInput.addEventListener("input", e => {
+    CAMERA_YAW = Number(e.target.value);
+    if (cameraYawValue) cameraYawValue.textContent = `${CAMERA_YAW}°`;
+  });
+}
+const cameraYawResetButton = document.getElementById("cameraYawResetButton");
+if (cameraYawResetButton) {
+  cameraYawResetButton.addEventListener("click", () => {
+    CAMERA_YAW = 0;
+    if (cameraYawInput) cameraYawInput.value = 0;
+    if (cameraYawValue) cameraYawValue.textContent = "0°";
+  });
+}
+
+// ---- 全画面表示の切り替え：canvas-wrapper(canvas本体＋その上にオーバーレイしている
+// サーブボタン・カメラ角度パネルなど)だけをFullscreen APIで全画面表示にする ----
+// Fullscreen APIは、全画面化した要素とその子孫だけを描画し、それ以外(左右のパネルや
+// 上部のプリセットツールバーなど)は自動的に非表示になる。ページ側で個別に他要素を
+// hiddenにする処理は不要。
+const fullscreenToggleButton = document.getElementById("fullscreenToggleButton");
+const canvasWrapperEl = document.querySelector(".canvas-wrapper");
+const supportsFullscreen = !!(canvasWrapperEl && canvasWrapperEl.requestFullscreen && document.exitFullscreen);
+if (fullscreenToggleButton) {
+  if (!supportsFullscreen) {
+    fullscreenToggleButton.disabled = true;
+    fullscreenToggleButton.title = "お使いのブラウザは全画面表示に対応していません";
+  } else {
+    fullscreenToggleButton.addEventListener("click", async () => {
+      try {
+        if (document.fullscreenElement === canvasWrapperEl) {
+          await document.exitFullscreen();
+        } else {
+          await canvasWrapperEl.requestFullscreen();
+        }
+      } catch (e) {
+        // ブラウザ側のユーザー操作制限などで拒否された場合は何もしない
+      }
+    });
+    // 全画面に入った/出た瞬間(Escキーで戻った場合も含む)に、ボタンの文言と
+    // canvasの内部解像度(width/height属性)を実際の表示サイズに合わせて更新する。
+    // 描画自体(project()等)はcanvas.width/heightを基準に組まれているため、
+    // この属性さえ書き換えれば次のフレームから自動的に全画面サイズで描かれる。
+    const playbackControlsEl = document.getElementById("playbackControls");
+    const presetBarEl = document.querySelector(".preset-bar");
+    const spinInfoEl = document.querySelector(".spin-info");
+    const serveButtonEl = document.getElementById("serveButton");
+    const resetButtonEl = document.getElementById("resetButton");
+    const cameraYawControlsEl = document.querySelector(".camera-yaw-controls");
+    // 「サーブを打つ」「表示リセット」を、左のplayback-controlsと右のカメラ角度パネルの
+    // ちょうど中間に来るよう毎回計算して置く。両パネルとも幅が中身次第(px固定ではない)で
+    // 決まるため、実際のgetBoundingClientRect()から余白を算出することで、画面幅が
+    // 変わっても常に中央に来るようにする(px直書きの固定オフセットだと画面幅によって
+    // 中央からズレてしまうため)。
+    function positionServeResetButtons() {
+      if (!serveButtonEl || !resetButtonEl || !playbackControlsEl || !cameraYawControlsEl) return;
+      const wrapperRect = canvasWrapperEl.getBoundingClientRect();
+      // style.leftはcanvas-wrapperのpadding端(=border-boxの内側)からのオフセットとして
+      // 解釈されるため、getBoundingClientRect()が返すborder-box基準の座標との間で
+      // border幅の分だけズレる。ここで補正しないと、計算上は中央のつもりでも実際の
+      // 描画が毎回border幅ぶん右にずれてしまう。
+      const wrapperStyle = getComputedStyle(canvasWrapperEl);
+      const originLeft = wrapperRect.left + (parseFloat(wrapperStyle.borderLeftWidth) || 0);
+      const pbRect = playbackControlsEl.getBoundingClientRect();
+      const cyRect = cameraYawControlsEl.getBoundingClientRect();
+      const buttonGap = 8;
+      const serveW = serveButtonEl.getBoundingClientRect().width;
+      const resetW = resetButtonEl.getBoundingClientRect().width;
+      const availLeft = pbRect.right - originLeft;
+      const availRight = cyRect.left - originLeft;
+      const combinedW = serveW + buttonGap + resetW;
+      const startLeft = availLeft + (availRight - availLeft - combinedW) / 2;
+      serveButtonEl.style.left = startLeft + "px";
+      resetButtonEl.style.left = (startLeft + serveW + buttonGap) + "px";
+    }
+    document.addEventListener("fullscreenchange", () => {
+      const isFullscreen = document.fullscreenElement === canvasWrapperEl;
+      fullscreenToggleButton.textContent = isFullscreen ? "⛶ 全画面を解除" : "⛶ 全画面表示";
+      if (isFullscreen) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      } else {
+        canvas.width = 900;
+        canvas.height = 600;
+      }
+      // 現在の回転表示(.spin-info)は、全画面表示の間だけ左下から、サーブ側の
+      // 「面の向き」「進行方向」パネル(canvas描画。render()内のdrawHudPanel呼び出しと
+      // 同じ位置・大きさの式)のすぐ下へ移す(この分、左下が空くので上のサーブを打つ／
+      // 表示リセットのボタンを左端まで詰められる)。全画面移行の直後はcanvas.width/height
+      // を上で画面サイズへ書き換えたばかりなので、ここで同じ式(render()側のhudScale計算)を
+      // 使えばパネルの実際の位置とぴったり合う。解除時はインラインstyleを外して、
+      // CSS側の通常の左下固定(left:1.1%; bottom:2.5%)に戻す。
+      if (spinInfoEl) {
+        if (isFullscreen) {
+          const hudScale = Math.min(canvas.width / 900, canvas.height / 600);
+          const hudMargin = 10 * hudScale, hudPanelH = 100 * hudScale;
+          spinInfoEl.style.left = hudMargin + "px";
+          spinInfoEl.style.top = (hudMargin + hudPanelH + 10 * hudScale) + "px";
+          spinInfoEl.style.bottom = "auto";
+        } else {
+          spinInfoEl.style.left = "";
+          spinInfoEl.style.top = "";
+          spinInfoEl.style.bottom = "";
+        }
+      }
+      // 再生速度・一時停止・表示倍率・表示位置リセットは、通常はcanvas-wrapperの
+      // 外(上部ツールバー)にあり、Fullscreen APIの制約で全画面中は描画されない。
+      // クローンは作らず、同じ要素をcanvas-wrapperの中へ実際に移動させることで、
+      // 値や見た目を常に同期させたまま全画面中も操作できるようにする。解除時は
+      // 元のツールバー(.preset-bar)の末尾へ戻す(元々そこにあった要素なので、
+      // appendChildで末尾に戻せば見た目上も元の位置に復元される)。
+      if (playbackControlsEl && presetBarEl) {
+        if (isFullscreen) {
+          canvasWrapperEl.appendChild(playbackControlsEl);
+        } else {
+          presetBarEl.appendChild(playbackControlsEl);
+        }
+      }
+      // 「サーブを打つ」「表示リセット」の左右中央寄せは、playback-controlsの移動が
+      // 終わった(＝実際の矩形が確定した)直後に計算する。解除時はインラインstyleを
+      // 外して、CSS側の通常配置(left:1.1%; top:22%/30%)に戻す。
+      if (isFullscreen) {
+        positionServeResetButtons();
+      } else if (serveButtonEl && resetButtonEl) {
+        serveButtonEl.style.left = "";
+        resetButtonEl.style.left = "";
+      }
+    });
+  }
+}
+
+// 一時停止/再開ボタン：isPaused(render()内で物理演算・スイングアニメーションの
+// 更新をスキップするフラグ)を切り替え、ボタンの表示も合わせて更新する。
+const pauseToggleButton = document.getElementById("pauseToggleButton");
+if (pauseToggleButton) {
+  pauseToggleButton.addEventListener("click", () => {
+    isPaused = !isPaused;
+    pauseToggleButton.textContent = isPaused ? "▶ 再開" : "⏸ 一時停止";
+  });
+}
+
+// 長さ(弾道距離)は球によらずサーブ(1球目)の威力にのみ使うサイド共通の値。
+// 1球目を編集中でなくても弾道設定には影響しないので、常にライブ反映してよい。
+const lengthInput = document.getElementById("length");
+if (lengthInput) {
+  lengthInput.addEventListener("input", () => {
+    if (currentShotNumber.server === 1) syncServerRacketFromUI();
+  });
+}
+
+// ============================================================
+// 球ごとの設定パネル(サーブ側・レシーブ側それぞれ1組の入力欄)を、<select>で
+// 「今どの球を編集しているか」を切り替えながら編集するための配線。3球目以降を
+// CRUD操作で自由に追加・削除できる。打つ位置(構える位置)は「待機位置」として
+// 使い、実際にボールを取りに行く動きは既存の自動追従(updateSideTracking)に
+// 任せる（過去に手動位置設定を試みて不自然な動きの問題が起きたため、実際の接触
+// 判定そのものは変更しない）。
+// ============================================================
+
+const SHOT_PANEL = {
+  server: {
+    select: document.getElementById("svShotSelect"),
+    addBtn: document.getElementById("svShotAddBtn"),
+    removeBtn: document.getElementById("svShotRemoveBtn"),
+    backhandEl: document.getElementById("svShotBackhand"),
+    fields: {
+      posX: "svShotPosX", depth: "svShotDepth", height: "svShotHeight", delayMs: "svShotDelayMs",
+      angle: "svShotAngle", tiltX: "svShotTiltX", rollAngle: "svShotRollAngle",
+      swingDir: "svShotSwingDir", swingY: "svShotSwingY", swingSpeed: "svShotSwingSpeed"
+    }
+  },
+  receiver: {
+    select: document.getElementById("rcShotSelect"),
+    addBtn: document.getElementById("rcShotAddBtn"),
+    removeBtn: document.getElementById("rcShotRemoveBtn"),
+    backhandEl: document.getElementById("rcShotBackhand"),
+    fields: {
+      posX: "rcShotPosX", depth: "rcShotDepth", height: "rcShotHeight", delayMs: "rcShotDelayMs",
+      angle: "rcShotAngle", tiltX: "rcShotTiltX", rollAngle: "rcShotRollAngle",
+      swingDir: "rcShotSwingDir", swingY: "rcShotSwingY", swingSpeed: "rcShotSwingSpeed"
+    }
+  }
+};
+
+// 選択中の球を編集すると、その場でラケット（と、1球目でボールが静止中ならボールの
+// 位置も）へ反映してライブプレビューする。以前は1・2球目だけ常時バインドしていたが、
+// 3球目以降もselectで表示している間は同じようにプレビューできるようにする
+// （パラメータ調整とアニメーション・HUDが連動しているように見せるため）。
+function applyLiveIfCurrent(n) {
+  if (n === 1) {
+    syncServerRacketFromUI();
+    if (!ball.moving) {
+      ball.pos = { x: serverRacket.pos.x, y: serverRacket.pos.y, z: serverRacket.pos.z };
+    }
+    return;
+  }
+  if (n === 2) {
+    syncReceiverRacketFromUI();
+    return;
+  }
+  const side = shotSide(n);
+  const racket = side === "server" ? serverRacket : receiverRacket;
+  const s = getShotSettings(n);
+  applySettingsToRacket(racket, s);
+  racket.backhand = s.backhand;
+  racket.pos = { x: s.posX, y: s.depth, z: s.height };
+  racket.activeShotNumber = n;
+}
+
+// side側パネルの入力欄に、現在選択中の球(shotData)の値を表示する。
+function fillPanelFromData(side) {
+  const p = SHOT_PANEL[side];
+  const s = shotData[currentShotNumber[side]];
+  Object.keys(p.fields).forEach(key => {
+    const el = document.getElementById(p.fields[key]);
+    if (el) el.value = s[key];
+  });
+  if (p.backhandEl) p.backhandEl.checked = !!s.backhand;
+  if (side === "server") {
+    // 長さ(弾道距離)は1球目(サーブ)にしか影響しないので、1球目を編集中の時だけ表示する。
+    const lengthControl = document.getElementById("lengthControl");
+    if (lengthControl) lengthControl.hidden = currentShotNumber.server !== 1;
+    // 打点を遅らせる時間は逆に、自動追従を使わない1球目(サーブ)には無関係なので、
+    // 1球目を編集中の時だけ非表示にする（レシーブ側は2球目から常に自動追従を使うので
+    // 常時表示のまま）。
+    const svDelayControl = document.getElementById("svDelayControl");
+    if (svDelayControl) svDelayControl.hidden = currentShotNumber.server === 1;
+  }
+}
+
+function bindShotPanel(side) {
+  const p = SHOT_PANEL[side];
+  Object.keys(p.fields).forEach(key => {
+    const el = document.getElementById(p.fields[key]);
+    if (!el) return;
+    el.addEventListener("input", () => {
+      const n = currentShotNumber[side];
+      shotData[n][key] = Number(el.value);
+      applyLiveIfCurrent(n);
+    });
+  });
+  if (p.backhandEl) {
+    p.backhandEl.addEventListener("change", () => {
+      const n = currentShotNumber[side];
+      shotData[n].backhand = p.backhandEl.checked;
+      applyLiveIfCurrent(n);
+    });
+  }
+  if (p.select) {
+    p.select.addEventListener("change", () => {
+      currentShotNumber[side] = Number(p.select.value);
+      fillPanelFromData(side);
+      applyLiveIfCurrent(currentShotNumber[side]);
+    });
+  }
+}
+bindShotPanel("server");
+bindShotPanel("receiver");
+
+function shotsForSide(side) {
+  const start = side === "server" ? 1 : 2;
+  const list = [];
+  for (let n = start; n <= totalShots; n += 2) list.push(n);
+  return list;
+}
+
+// <select>の選択肢を今のtotalShotsに合わせて作り直す。
+function refreshShotSelect(side) {
+  const p = SHOT_PANEL[side];
+  if (!p.select) return;
+  p.select.innerHTML = shotsForSide(side).map(n => `<option value="${n}">${n}球目</option>`).join("");
+  p.select.value = String(currentShotNumber[side]);
+}
+
+// 追加・削除ボタンの表示・文言を、今の球数に合わせて更新する。追加ボタンは「次に
+// 追加できる球(奇偶)」を持つ側だけ表示し、削除ボタンは「今の最後の球」を持つ側だけ
+// 表示する（常に末尾の球しか消せないようにし、途中の球だけ消して歯抜けになるのを防ぐ）。
+function refreshShotControls() {
+  const nextSide = shotSide(totalShots + 1);
+  const canAdd = totalShots < MAX_SHOTS;
+  const lastSide = shotSide(totalShots);
+  const canRemove = totalShots > 2;
+
+  ["server", "receiver"].forEach(side => {
+    const p = SHOT_PANEL[side];
+    if (p.addBtn) {
+      p.addBtn.hidden = nextSide !== side;
+      p.addBtn.disabled = !canAdd;
+      if (canAdd) {
+        p.addBtn.textContent = `＋ ${totalShots + 1}球目を追加`;
+        p.addBtn.title = "";
+      } else {
+        // MAX_SHOTSに達したら「＋N球目を追加」のままにせず、押せない理由が
+        // 一目で分かる文言に差し替える（背景色もCSS側の.preset-btn:disabledで
+        // グレーにする）。
+        p.addBtn.textContent = "追加上限です";
+        p.addBtn.title = `これ以上球を追加できません（最大${MAX_SHOTS}球まで）`;
+      }
+    }
+    if (p.removeBtn) {
+      p.removeBtn.hidden = !(canRemove && lastSide === side);
+      p.removeBtn.textContent = `－ ${totalShots}球目を削除`;
+    }
+  });
+}
+
+function addShotForSide(side) {
+  if (totalShots >= MAX_SHOTS) return;
+  totalShots++;
+  const n = totalShots;
+  const previousShotNumber = n - 2;
+  shotData[n] = {
+    ...defaultShotData(n),
+    ...(shotData[previousShotNumber] || {}),
+    // ⑥前後スイングだけは2つ前の球の値を引き継がず、常にラリー用既定値(1)から
+    // 始める（1球目/2球目のswingSpeedをそのまま引き継ぐと3球目以降が意図せず
+    // サーブ・レシーブ並みの速さになってしまうため）。
+    ...(n >= 3 ? { swingSpeed: DEFAULT_RALLY_SWING_SPEED } : {})
+  };
+  currentShotNumber[side] = n; // 追加した球へ自動的に切り替えて見せる
+  refreshShotSelect(side);
+  refreshShotControls();
+  fillPanelFromData(side);
+  applyLiveIfCurrent(n);
+}
+
+function removeLastShotForSide(side) {
+  if (totalShots <= 2) return;
+  const n = totalShots;
+  delete shotData[n];
+  totalShots--;
+  if (currentShotNumber[side] === n) {
+    currentShotNumber[side] = Math.max(n - 2, side === "server" ? 1 : 2);
+  }
+  refreshShotSelect(side);
+  refreshShotControls();
+  fillPanelFromData(side);
+  applyLiveIfCurrent(currentShotNumber[side]);
+}
+
+if (SHOT_PANEL.server.addBtn) SHOT_PANEL.server.addBtn.addEventListener("click", () => addShotForSide("server"));
+if (SHOT_PANEL.receiver.addBtn) SHOT_PANEL.receiver.addBtn.addEventListener("click", () => addShotForSide("receiver"));
+if (SHOT_PANEL.server.removeBtn) SHOT_PANEL.server.removeBtn.addEventListener("click", () => removeLastShotForSide("server"));
+if (SHOT_PANEL.receiver.removeBtn) SHOT_PANEL.receiver.removeBtn.addEventListener("click", () => removeLastShotForSide("receiver"));
+
+refreshShotSelect("server");
+refreshShotSelect("receiver");
+refreshShotControls();
+fillPanelFromData("server");
+fillPanelFromData("receiver");
+
+
+const serveBtn = document.getElementById("serveButton");
+if (serveBtn) serveBtn.addEventListener("click", serve);
+
+const resetBtn = document.getElementById("resetButton");
+if (resetBtn) {
+  resetBtn.addEventListener("click", () => {
+    setupBallToRacket();
+    serverRacket.selected = false;
+    receiverRacket.selected = false;
+    centerPanDragging = false;
+    setStatus("サーブ待機");
+    updateSpinText(ball);
+  });
+}
+
+syncServerRacketFromUI();
+syncReceiverRacketFromUI();
+setupBallToRacket();
+
+
+// ============================================================
+// アニメーションループ（実時間→固定ステップ物理へ変換。SLOW_MOTIONで観察しやすくする）
+// ============================================================
+
+function render(timestamp) {
+  if (lastTimestamp === null) lastTimestamp = timestamp;
+  const realDt = clamp((timestamp - lastTimestamp) / 1000, 0, 0.05) || 0;
+  lastTimestamp = timestamp;
+
+  // 一時停止中は、物理演算・スイングアニメーションの更新だけを止める（描画自体は
+  // 続けるので、ラケットのドラッグ移動は一時停止中も反映される）。停止直前に
+  // physicsAccumulatorへ溜まった分を再開時にまとめて消化して早送りにならないよう、
+  // 一時停止中はrealDt分の蓄積も行わない。
+  if (!isPaused) {
+    physicsAccumulator += realDt * SLOW_MOTION;
+    while (physicsAccumulator >= PHYSICS_DT) {
+      stepPhysics(PHYSICS_DT);
+      physicsAccumulator -= PHYSICS_DT;
+      if (!ball.moving) { physicsAccumulator = 0; break; }
+    }
+  }
+
+  animFrameCount++;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // 腕の振り抜きアニメーション(swingProgress)はフレームごとの固定量で進む作りなので、
+  // 「再生速度」スライダーでSLOW_MOTIONを変えても連動しない。ボールの物理再生速度と
+  // 揃って速く/遅く感じられるよう、デフォルト値(0.32)からの比率を掛けて同期させる
+  // （SLOW_MOTION自体は物理演算の結果には影響しないのと同じく、ここも見た目の速さだけ）。
+  const swingAnimScale = SLOW_MOTION / 0.32;
+  if (!isPaused) {
+    updateSwingAnimation(serverRacket, swingAnimScale, realDt);
+    updateSwingAnimation(receiverRacket, swingAnimScale, realDt);
+  }
+  drawBackground();
+  // 胴体のシルエットは、台の向こう側(奥)に立っている選手の方だけを台より先に
+  // (＝台の背面になるように)描く。カメラ角度(CAMERA_YAW)が90°を超えると、
+  // カメラは台を挟んでサーブ側の近くまで回り込み、手前(近く)・奥(遠く)の関係が
+  // サーブ側とレシーブ側で入れ替わる(project()のカメラ軌道は、注視点からの
+  // 水平距離を保ったままCAMERA_YAWで回るだけなので、90°がちょうど「サーブ側と
+  // レシーブ側のどちらに近いか」の境目になる)。そのため90°を境に、奥側になった
+  // 方の胴体シルエットを台の背面に、手前側になった方を台の前面に描き直す。
+  // 腕・ラケット本体(胴体以外)は台を描いた後、下の画家のアルゴリズムの並びで
+  // 描くため、この入れ替えの影響を受けない。
+  const cameraPastNinety = CAMERA_YAW > 90;
+  const backRacket = cameraPastNinety ? receiverRacket : serverRacket;
+  const frontRacket = cameraPastNinety ? serverRacket : receiverRacket;
+  drawRacketBase(backRacket);
+  drawTable();
+  // サーブ側ラケットとボールは、実際の奥行き(ワールドY。奥=小さい値、手前=大きい値)の
+  // 値で前後を決める（画家のアルゴリズム）。
+  // レシーブ側は、実際の奥行きではなく常にラケット(ラバー面)がボールの手前に見えるように
+  // 固定する。
+  // ただし、drawRacketBase内で描く胴体のシルエットはラケットの実体ではないので、
+  // ボールの高さ(Z)とラケットの高さを比べて、ボールがラケットより高ければシルエットより
+  // 手前、低ければシルエットより奥になるようにする（シルエットはラケットの中心の高さに
+  // ある土台なので、ボールがそれより上にあるか下にあるかで、自然にどちらが前に
+  // 見えるべきかが変わる）。台の前面に描く側(frontRacket)は、90°を境にサーブ側・
+  // レシーブ側どちらにもなり得るため、receiverRacket固定ではなくfrontRacketを使う。
+  const ballAboveFrontRacket = ball.pos.z > frontRacket.pos.z;
+  const frontBaseSortY = ball.pos.y + (ballAboveFrontRacket ? -1 : 1);
+  // レシーブが上手く返らず、サーバー側へ向かわずにレシーバーの後ろへ逸れてしまった
+  // (ball.pos.yがレシーバーの位置を越えて奥＝カメラ側に抜けた)場合は、実際の奥行きとして
+  // ボールがラケットより手前にあるはずなので、そのケースだけはボールをブレード・腕より
+  // 手前に描く（それ以外の通常の返球では、ラケットを常にボールの手前に描く）。
+  // ボールとラケット面(ラバー)の前後関係も、胴体シルエットと同じ理由(90°を境に
+  // カメラに近い側が入れ替わる)で入れ替える。「手前(frontRacket)側は、ボールが
+  // 後方へ大きく逸れた場合を除き、常にラケット面がボールの手前に見える」という
+  // 元々のレシーブ側の挙動を、90°以下ではそのままレシーブ側に、90°を超えたら
+  // サーブ側に適用する。逆に「奥(backRacket)側は、ボールが常にラケット面の手前に
+  // 見える」を、90°を超えて奥側になったレシーブ側に新たに適用する(90°以下の
+  // サーブ側は、これまで通り実際の奥行き(pos.y)で自然に前後を決める＝変更なし)。
+  const ballPastFront = (ball.pos.y - frontRacket.pos.y) * frontRacket.forwardSign < 0;
+  const frontBladeSortY = ball.pos.y + (ballPastFront ? -2 : 2);
+  const serverBladeSortY = frontRacket === serverRacket ? frontBladeSortY : serverRacket.pos.y;
+  const receiverBladeSortY = frontRacket === receiverRacket ? frontBladeSortY : ball.pos.y - 2;
+
+  [
+    { y: serverBladeSortY, draw: () => drawRacketBladeAndArm(serverRacket) },
+    { y: frontBaseSortY, draw: () => drawRacketBase(frontRacket) },
+    { y: ball.pos.y, draw: drawBall },
+    { y: receiverBladeSortY, draw: () => drawRacketBladeAndArm(receiverRacket) }
+  ]
+    .sort((a, b) => a.y - b.y)
+    .forEach(item => item.draw());
+  // 弾道の軌跡(黄色い線)は、上の画家のアルゴリズムには含めず常に最後(=両ラケットより手前)に
+  // 描く。以前はdrawBall()の一部としてボールと同じ奥行き(ball.pos.y＝現在位置)で
+  // ソートしていたため、球を打った直後は現在位置が奥行き比較上ラケットより奥と判定され、
+  // 軌跡の始点(＝打点、ラケットのすぐそば)だけがラケットの絵に隠れて「ラケットの後ろから
+  // 線が始まっている」ように見えてしまっていた。軌跡は実際の当たり判定に使う値ではなく
+  // あくまで見た目の補助線なので、常に手前に描いて隠れないようにする。
+  drawTrail();
+  // 方向表示はラケットの位置に連動させず、常に固定位置に表示する
+  // （サーブ側＝左上、レシーブ側＝右上）
+  // 全画面表示(⛶ボタン、fullscreenchangeイベントでcanvas.width/heightを画面サイズに
+  // 書き換える)の時だけ、これらのHUDパネルも大きく表示する。パネルの位置・大きさ・
+  // 内部のゲージや文字のサイズはすべて固定pxで組まれており、canvasの解像度に
+  // 連動しない(台や選手はproject()の透視投影で自動的に大きく見えるが、HUDは
+  // 画面に張り付ける2D要素のため別)。通常時(canvas.width/height=900x600)は
+  // hudScale=1のまま、全画面で解像度が上がった分だけ比例して拡大する
+  // (縦横どちらかだけ極端に伸びても破綻しないよう、幅・高さ両方の比の小さい方を使う)。
+  const hudScale = Math.min(canvas.width / 900, canvas.height / 600);
+  const hudPanelW = 180 * hudScale, hudPanelH = 100 * hudScale, hudMargin = 10 * hudScale;
+  drawHudPanel(hudMargin, hudMargin, hudPanelW, hudPanelH, "サーブ側", serverRacket, hudScale);
+  drawHudPanel(canvas.width - hudMargin - hudPanelW, hudMargin, hudPanelW, hudPanelH, "レシーブ側", receiverRacket, hudScale);
+  // レシーブ側の画面固定HUDのすぐ下に、今何球目かが一目で分かる小さなカウント表示を置く。
+  drawShotCountBadge(canvas.width - hudMargin - hudPanelW, hudMargin + hudPanelH + 10 * hudScale, hudPanelW, 34 * hudScale, hudScale);
+  // 表示位置(パン)ハンドルは、ラケットやHUDより常に手前で操作できるよう最後に描く
+  drawCenterPanHandle();
+  requestAnimationFrame(render);
+}
+
+requestAnimationFrame(render);
+</script>
+<script>
+// ============================================================
+// パラメータのプリセット保存・呼び出し
+// localStorageもデータベースも使わず、実体は手元のJSONファイルとして保存・読み込みする。
+// ファイルをそのまま他の人に渡せば、そのままプリセットとして使ってもらえる。
+// 「一覧」は、そのタブを開いている間だけ保持するメモリ上の配列（ページを閉じる/
+// 再読み込みすると消える。永続化はあえてせず、必要ならファイルとして手元に残す方針）。
+//
+// 「保存フォルダを選ぶ」でFile System Access APIのフォルダ選択ダイアログを開き、
+// 例えばプロジェクト内の presets フォルダを指定すると、以後の保存はダイアログなしで
+// そこへ直接書き込まれ、既にある.jsonファイルも一覧に読み込まれる。選んだフォルダの
+// ハンドルはメモリ上の変数(presetDirHandle)に持つだけでどこにも保存しないので、
+// タブを閉じる/再読み込みすると選択は消える（これもlocalStorage/DB不使用の方針通り）。
+// 対応ブラウザ(Chrome/Edge系)が無い場合は、従来通りダウンロード保存にフォールバックする。
+// ============================================================
+
+// 「元に戻す」機能(このファイル下部)が変更を監視する対象のDOM id一覧。球ごとの
+// 入力欄は「今選択中の球」の値を表示・編集する共通欄なので、これらのidを監視する
+// だけでよい（選択中の球を跨いだ変更の巻き戻しはできないが、直前の1操作だけを戻す
+// 簡易機能のため許容する）。プリセットの保存・復元自体は下のcollectCurrentValues()/
+// applyValues()がshotDataを直接読み書きするので、この一覧には依存しない。
+const PRESET_FIELD_IDS = [
+  "length",
+  "svShotPosX", "svShotDepth", "svShotHeight",
+  "svShotAngle", "svShotTiltX", "svShotRollAngle",
+  "svShotSwingDir", "svShotSwingY", "svShotSwingSpeed",
+  "rcShotPosX", "rcShotDepth", "rcShotHeight",
+  "rcShotAngle", "rcShotTiltX", "rcShotRollAngle",
+  "rcShotSwingDir", "rcShotSwingY", "rcShotSwingSpeed"
+];
+
+// チェックボックス項目は value(文字列)ではなくchecked(真偽値)で監視・復元し、
+// 反映時もinputではなくchangeイベントを発火させる（bindCheckbox/bindShotPanelが
+// changeイベントを見ているため）。
+const PRESET_CHECKBOX_FIELD_IDS = ["svShotBackhand", "serveLeftHanded", "rcShotBackhand", "receiveLeftHanded"];
+
+// 3球目以降(球ごとに追加される設定)の接尾辞。旧形式プリセット(shot3Angle等)の
+// キー名からshotDataのプロパティ名(angle等)への変換にも使う。
+const SHOT_FIELD_SUFFIXES = ["Angle", "TiltX", "RollAngle", "SwingDir", "SwingY", "SwingSpeed"];
+
+// 旧形式(球ごとに個別のDOM idを持っていた頃)のプリセットを読み込むための対応表。
+// presets/フォルダの既存ファイルはすべてこの旧形式（1・2球目のみ、位置は無し）。
+const LEGACY_SHOT_KEY_MAP = {
+  1: {
+    serveRacketAngle: "angle", serveTiltX: "tiltX", serveRollAngle: "rollAngle",
+    serveSwingDir: "swingDir", serveSwingY: "swingY", serveSwingSpeed: "swingSpeed",
+    serveX: "posX", serveDepth: "depth", serveHeight: "height"
+  },
+  2: {
+    racketAngle: "angle", receiveTiltX: "tiltX", receiveRollAngle: "rollAngle",
+    receiveSwingDir: "swingDir", receiveSwingY: "swingY", swingSpeed: "swingSpeed"
+  }
+};
+const LEGACY_SHOT_BACKHAND_KEY = { 1: "serveBackhand", 2: "receiveBackhand" };
+
+// このタブを開いている間だけ保持する、読み込み済みプリセットのメモリ上の一覧
+// （localStorageやDBには保存しない。ページを再読み込みすると空に戻る）
+let presetSessionList = [];
+
+// File System Access APIに対応しているか（Chrome/Edge系のみ。Firefox/Safariは非対応）
+const supportsFSAccess = typeof window.showDirectoryPicker === "function";
+
+// 「保存フォルダを選ぶ」で選んだフォルダのハンドル。メモリ上だけに置き、
+// どこにも永続化しない（タブを閉じる/再読み込みすると消え、次回また選び直す）
+let presetDirHandle = null;
+
+// 今画面に入っている全パラメータの値を集める。球ごとの設定はshotDataを
+// そのまま（球番号→設定一式のオブジェクトとして）保存する。
+function collectCurrentValues() {
+  const values = {
+    length: getVal("length", 50),
+    serveLeftHanded: document.getElementById("serveLeftHanded")?.checked || false,
+    receiveLeftHanded: document.getElementById("receiveLeftHanded")?.checked || false,
+    totalShots,
+    shots: {}
+  };
+  for (let n = 1; n <= totalShots; n++) {
+    values.shots[n] = { ...(shotData[n] || defaultShotData(n)) };
+  }
+  return values;
+}
+
+// 旧形式のフラットなキーから、n球目分のshotDataを組み立てる。
+function legacyShotData(values, n) {
+  const data = defaultShotData(n);
+  const map = LEGACY_SHOT_KEY_MAP[n];
+  if (map) {
+    Object.keys(map).forEach(oldKey => {
+      if (oldKey in values) data[map[oldKey]] = Number(values[oldKey]);
+    });
+  } else {
+    SHOT_FIELD_SUFFIXES.forEach(suffix => {
+      const oldKey = `shot${n}${suffix}`;
+      if (oldKey in values) data[suffix[0].toLowerCase() + suffix.slice(1)] = Number(values[oldKey]);
+    });
+  }
+  const backhandKey = LEGACY_SHOT_BACKHAND_KEY[n] || `shot${n}Backhand`;
+  if (backhandKey in values) data.backhand = !!values[backhandKey];
+  return data;
+}
+
+// 保存されている値を反映する。新形式(values.shots)はそのまま、旧形式(presets/配下の
+// 既存ファイルなど、values.shotsが無いもの)は対応表でマッピングして読み込む。
+function applyValues(values) {
+  const targetTotal = values.totalShots || 2; // totalShotsが無い旧プリセットは2球のみ扱う
+
+  totalShots = 2;
+  shotData = { 1: defaultShotData(1), 2: defaultShotData(2) };
+  for (let n = 3; n <= targetTotal; n++) shotData[n] = defaultShotData(n);
+  totalShots = targetTotal;
+
+  if (values.shots) {
+    Object.keys(values.shots).forEach(key => {
+      const n = Number(key);
+      if (n >= 1 && n <= totalShots) shotData[n] = { ...defaultShotData(n), ...values.shots[key] };
+    });
+  } else {
+    for (let n = 1; n <= totalShots; n++) shotData[n] = legacyShotData(values, n);
+  }
+
+  currentShotNumber = { server: 1, receiver: 2 };
+  refreshShotSelect("server");
+  refreshShotSelect("receiver");
+  refreshShotControls();
+  fillPanelFromData("server");
+  fillPanelFromData("receiver");
+
+  const lengthEl = document.getElementById("length");
+  if (lengthEl) {
+    lengthEl.value = values.length ?? 50;
+    lengthEl.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  const serveLeftHandedEl = document.getElementById("serveLeftHanded");
+  if (serveLeftHandedEl) {
+    serveLeftHandedEl.checked = !!values.serveLeftHanded;
+    serveLeftHandedEl.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  const receiveLeftHandedEl = document.getElementById("receiveLeftHanded");
+  if (receiveLeftHandedEl) {
+    receiveLeftHandedEl.checked = !!values.receiveLeftHanded;
+    receiveLeftHandedEl.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  // 選択中の球(1球目・2球目)の見た目にも反映する。
+  syncServerRacketFromUI();
+  syncReceiverRacketFromUI();
+}
+
+function setPresetMessage(text) {
+  const el = document.getElementById("presetMessage");
+  if (el) el.textContent = text;
+}
+
+function setDirStatus(text) {
+  const el = document.getElementById("presetDirStatus");
+  if (el) el.textContent = text;
+}
+
+// 選択中の保存フォルダの中身を読み、まだ一覧に無い.jsonファイルを追加する
+// （中身は今は読まず、名前だけ先に一覧へ出す。実際の値は「呼び出す」時に必要になってから読む）
+// 走査中に何か1件でも例外が起きても全体を巻き込んで固まらないよう、必ず最後に
+// refreshPresetSelect()まで到達させる（呼び出し側でモーダルを閉じ損なわないようにするため）
+async function scanPresetDirectory() {
+  if (!presetDirHandle) return;
+  try {
+    for await (const [entryName, handle] of presetDirHandle.entries()) {
+      if (handle.kind !== "file" || !entryName.toLowerCase().endsWith(".json")) continue;
+      const displayName = entryName.replace(/\.json$/i, "");
+      if (presetSessionList.some(p => p.name === displayName)) continue;
+      presetSessionList.push({ name: displayName, fileHandle: handle, fileName: entryName });
+    }
+  } catch (e) {
+    setPresetMessage("フォルダの中身の読み込み中にエラーが発生しました");
+  }
+  refreshPresetSelect();
+}
+
+// ファイル名として使えない文字を落として整える
+function sanitizeFileName(name) {
+  return name.replace(/[\\/:*?"<>|]/g, "").trim() || "preset";
+}
+
+// <select>の選択肢を、今のタブで読み込んだプリセット名の一覧で作り直す
+function refreshPresetSelect(selectedName) {
+  const select = document.getElementById("presetSelect");
+  if (!select) return;
+
+  select.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = presetSessionList.length
+    ? "-- このタブで読み込んだプリセット --"
+    : "-- まだ読み込んだプリセットはありません --";
+  select.appendChild(placeholder);
+
+  // 一覧内の並び順(読み込んだ順)はそのままに、表示だけ名前の昇順にする。
+  // ただし「デフォルト」という名前のプリセットがある場合は常に先頭に固定する。
+  const sortedList = [...presetSessionList].sort((a, b) => {
+    const aIsDefault = a.name === "デフォルト";
+    const bIsDefault = b.name === "デフォルト";
+    if (aIsDefault !== bIsDefault) return aIsDefault ? -1 : 1;
+    return a.name.localeCompare(b.name, "ja", { numeric: true });
+  });
+  sortedList.forEach(preset => {
+    const opt = document.createElement("option");
+    opt.value = preset.name;
+    opt.textContent = preset.name;
+    select.appendChild(opt);
+  });
+
+  if (selectedName && presetSessionList.some(p => p.name === selectedName)) {
+    select.value = selectedName;
+  }
+}
+
+// 一覧(メモリ上)に追加・上書きする
+function upsertSessionPreset(name, values) {
+  const existing = presetSessionList.find(p => p.name === name);
+  if (existing) {
+    existing.values = values;
+  } else {
+    presetSessionList.push({ name, values });
+  }
+}
+
+refreshPresetSelect();
+setDirStatus(supportsFSAccess
+  ? "📁 保存先フォルダ未選択（「ファイルに保存」を押すと、初回だけこのプロジェクト内の presets フォルダなどを選ぶダイアログが出ます）"
+  : "📁 このブラウザはフォルダ自動保存に非対応です（保存はダウンロード、読み込みは「ファイルから読み込む」で行えます）");
+
+// フォルダ選択ダイアログを開き、許可が取れたらpresetDirHandleにセットする。
+// 「保存フォルダを選ぶ」ボタンと、「ファイルに保存」の初回クリック（フォルダ未選択時）の
+// 両方から呼ばれる共通処理。ブラウザの仕様上、ユーザーの実際のクリック操作が無いと
+// フォルダへのアクセスは求められないため、コード側で自動的に事前に呼ぶことはできない
+// （＝完全に無操作で自動指定する、ということ自体が実現不可能な制約）。
+// 戻り値: フォルダを設定できたら true、キャンセル/失敗なら false
+async function pickPresetDirectory() {
+  let handle;
+  try {
+    handle = await window.showDirectoryPicker();
+  } catch (e) {
+    // ユーザーがダイアログをキャンセルした場合は仕様上AbortErrorになる。それ以外の
+    // エラー(環境側の問題など)は無言で握りつぶさず、原因が分かるようメッセージに出す
+    // (以前は全エラーを無反応でキャンセル扱いにしていたため、原因不明のまま
+    // 「ボタンを押しても反応がない」ように見えてしまっていた)。
+    if (e && e.name !== "AbortError") {
+      setPresetMessage(`フォルダの選択に失敗しました（${e.name}: ${e.message}）`);
+    }
+    return false;
+  }
+  try {
+    const perm = await handle.requestPermission({ mode: "readwrite" });
+    if (perm !== "granted") {
+      setPresetMessage("フォルダへの書き込みが許可されませんでした");
+      return false;
+    }
+  } catch (e) {
+    // requestPermission未対応の環境でもとりあえず使えるだけ使ってみる
+  }
+  presetDirHandle = handle;
+  setDirStatus(`📁 保存先フォルダ: 「/${handle.name}」（このタブを閉じるまで有効）`);
+  try {
+    await scanPresetDirectory();
+  } catch (e) {
+    // 走査に失敗しても、フォルダ自体は選べているので致命的エラーにはしない
+  }
+  return true;
+}
+
+// ---- ページを開いた/リロードした直後に一度だけ出す、フォルダ選択モーダル ----
+// これも「クリック無しで自動読み込み」自体は（ブラウザの仕様上）実現できないための
+// 折衷案：フォルダへのアクセスに必ず要る1クリックを、何かのボタンのついでではなく
+// ページを開いた最初のタイミングでまとめてお願いする。
+const presetDirModal = document.getElementById("presetDirModal");
+const presetDirModalPick = document.getElementById("presetDirModalPick");
+const presetDirModalSkip = document.getElementById("presetDirModalSkip");
+if (presetDirModal && presetDirModalPick && presetDirModalSkip) {
+  if (supportsFSAccess) {
+    presetDirModal.hidden = false;
+    presetDirModalPick.addEventListener("click", async () => {
+      let ok = false;
+      try {
+        ok = await pickPresetDirectory();
+      } catch (e) {
+        setPresetMessage("フォルダの選択中にエラーが発生しました");
+      } finally {
+        // 成功・失敗・例外のいずれでも、モーダルが開いたまま固まらないよう必ず閉じる
+        presetDirModal.hidden = true;
+      }
+      if (ok) {
+        // フォルダを選んだ直後、一覧の一番上のプリセットを自動的に読み込む
+        // (アプリを開いた時/リロードした時も、後から「フォルダを選ぶ」で選び直した
+        // 時と同じ挙動にする)
+        const applied = await autoApplyTopPreset();
+        if (!applied) setPresetMessage(`「${presetDirHandle.name}」フォルダを読み込みました`);
+      }
+    });
+    presetDirModalSkip.addEventListener("click", () => {
+      presetDirModal.hidden = true;
+    });
+  }
+  // 非対応ブラウザではモーダル自体を出さない（hidden属性のまま＝表示しない）
+}
+
+// ---- 「保存フォルダを選ぶ」：以後「ファイルに保存」がこのフォルダへ直接書き込むようにする ----
+const presetPickDirButton = document.getElementById("presetPickDirButton");
+if (presetPickDirButton) {
+  if (!supportsFSAccess) {
+    presetPickDirButton.disabled = true;
+    presetPickDirButton.title = "お使いのブラウザは対応していません（Chrome/Edge推奨）";
+  } else {
+    presetPickDirButton.addEventListener("click", async () => {
+      const ok = await pickPresetDirectory();
+      if (ok) setPresetMessage(`「${presetDirHandle.name}」フォルダを保存先に設定しました`);
+    });
+  }
+}
+
+// ---- 「ファイルに保存」：保存フォルダが選択済みならそこへ直接、未選択ならダウンロードで保存する ----
+const presetSaveButton = document.getElementById("presetSaveButton");
+if (presetSaveButton) {
+  presetSaveButton.addEventListener("click", async () => {
+    const nameInput = document.getElementById("presetName");
+    const name = nameInput ? nameInput.value.trim() : "";
+    if (!name) {
+      setPresetMessage("名前を入力してください");
+      return;
+    }
+
+    // フォルダをまだ選んでいなければ、保存のこのクリック自体をきっかけに選んでもらう
+    // （事前に「保存フォルダを選ぶ」を押し忘れていても、保存しようとした瞬間に自然に聞かれる）
+    if (!presetDirHandle && supportsFSAccess) {
+      await pickPresetDirectory();
+    }
+
+    const values = collectCurrentValues();
+    const data = { name, values };
+    const fileName = sanitizeFileName(name) + ".json";
+
+    if (presetDirHandle) {
+      try {
+        // 同名のファイルが既にフォルダ内にあるか確認する（create指定無しでgetFileHandle()を
+        // 呼び、無ければエラーになることを利用する）。あれば上書きしてよいか確認ダイアログを
+        // 出し、キャンセルされたら何も書き込まずに終える（新規保存や、意図した上書きの
+        // 場合は今まで通り確認なしで進む）。
+        let fileExists = false;
+        try {
+          await presetDirHandle.getFileHandle(fileName);
+          fileExists = true;
+        } catch (e) {
+          fileExists = false; // 見つからない=新規保存
+        }
+        if (fileExists && !window.confirm(`「${name}」に上書きしますか？`)) {
+          setPresetMessage("保存をキャンセルしました");
+          return;
+        }
+
+        const fileHandle = await presetDirHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(data, null, 2));
+        await writable.close();
+
+        upsertSessionPreset(name, values);
+        const entry = presetSessionList.find(p => p.name === name);
+        if (entry) {
+          entry.fileHandle = fileHandle;
+          entry.fileName = fileName;
+        }
+        refreshPresetSelect(name);
+        setPresetMessage(`「${name}」を「${presetDirHandle.name}」フォルダに保存しました`);
+        return;
+      } catch (e) {
+        setPresetMessage("フォルダへの保存に失敗したため、ダウンロードで保存します");
+        // 失敗時は下の従来方式にフォールスルーする
+      }
+    }
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    // 保存と同時に、このタブの一覧にも入れておく（すぐ呼び出しに使えるように）
+    upsertSessionPreset(name, values);
+    refreshPresetSelect(name);
+    setPresetMessage(`「${name}」をファイルに保存しました`);
+  });
+}
+
+// ---- 「ファイルから読み込む」：JSONファイルを選んでプリセットを読み込む ----
+const presetLoadFileButton = document.getElementById("presetLoadFileButton");
+const presetFileInput = document.getElementById("presetFileInput");
+if (presetLoadFileButton && presetFileInput) {
+  presetLoadFileButton.addEventListener("click", () => {
+    presetFileInput.click();
+  });
+  presetFileInput.addEventListener("change", () => {
+    const file = presetFileInput.files && presetFileInput.files[0];
+    presetFileInput.value = ""; // 同じファイルを続けて選んでもchangeが発火するようにリセット
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data;
+      try {
+        data = JSON.parse(reader.result);
+      } catch (e) {
+        setPresetMessage("ファイルの読み込みに失敗しました（JSON形式ではありません）");
+        return;
+      }
+      const name = data.name || file.name.replace(/\.json$/i, "");
+      const values = data.values || data; // 古い形式(値だけ)にも一応対応
+      applyValues(values);
+      const nameInput = document.getElementById("presetName");
+      if (nameInput) nameInput.value = name;
+      upsertSessionPreset(name, values);
+      refreshPresetSelect(name);
+      setPresetMessage(`「${name}」を読み込みました`);
+    };
+    reader.onerror = () => setPresetMessage("ファイルの読み込みに失敗しました");
+    reader.readAsText(file);
+  });
+}
+
+// ---- プリセット<select>で選び直した瞬間に、そのプリセットをそのまま適用する ----
+// 以前は選んでから別途「呼び出す」ボタンを押す2段階だったが、下の通り「呼び出す」
+// ボタンはフォルダ選択の方に転用したため、プリセットの読み込み自体は選んだ瞬間に
+// 行う(誤って隣のプリセットを選んでしまっても、見た目がすぐ切り替わるので気付きやすい)。
+async function applySelectedPreset() {
+  const select = document.getElementById("presetSelect");
+  const name = select ? select.value : "";
+  if (!name) return; // プレースホルダー(未選択)に戻った時は何もしない
+
+  const preset = presetSessionList.find(p => p.name === name);
+  if (!preset) {
+    setPresetMessage("そのプリセットは見つかりませんでした");
+    return;
+  }
+
+  let values = preset.values;
+  if (!values && preset.fileHandle) {
+    // フォルダ一覧から見つけただけでまだ中身を読んでいないプリセット。ここで初めて読む
+    try {
+      const file = await preset.fileHandle.getFile();
+      const text = await file.text();
+      const data = JSON.parse(text);
+      values = data.values || data;
+      preset.values = values; // 次回以降は読み直さなくて済むようキャッシュしておく
+    } catch (e) {
+      setPresetMessage("プリセットファイルの読み込みに失敗しました");
+      return;
+    }
+  }
+  if (!values) {
+    setPresetMessage("プリセットの内容を読み込めませんでした");
+    return;
+  }
+
+  applyValues(values);
+  const nameInput = document.getElementById("presetName");
+  if (nameInput) nameInput.value = name;
+  setPresetMessage(`「${name}」を呼び出しました`);
+}
+const presetSelectForApply = document.getElementById("presetSelect");
+if (presetSelectForApply) {
+  presetSelectForApply.addEventListener("change", () => { applySelectedPreset(); });
+}
+
+// ---- フォルダを選んだ直後、<select>の一番上(プレースホルダーの次)にあるプリセットを
+// 自動的に選んで読み込む ----
+// アプリを開いた時/リロードした時の最初のモーダル、後からいつでも選び直せる
+// 「フォルダを選ぶ」ボタン、どちらも「フォルダを選んだ」という点では同じなので、
+// この共通処理としてまとめる(選ぶだけでは何も反映されないので、applySelectedPreset()を
+// 直接呼んで読み込みまで行う。中身が1件も無いフォルダならプレースホルダーしか
+// 無いのでそのまま何もしない)。
+async function autoApplyTopPreset() {
+  const select = document.getElementById("presetSelect");
+  if (select && select.options.length > 1) {
+    select.value = select.options[1].value;
+    await applySelectedPreset();
+    return true;
+  }
+  return false;
+}
+
+// ---- 「設定値リセット」：画面上でスライダー等をいじって選択中のプリセットから
+// 変わってしまった値を、そのプリセットのファイル内容に戻す ----
+// <select>で選び直した時と違い、既に選択済みのプリセットを選び直しても(値が変わらない
+// ため)changeイベントは発火しない。このボタンは、今選ばれているプリセットのまま
+// 強制的に読み込み直したい場合向け。ファイル由来のプリセット(fileHandleを持つもの)は
+// キャッシュ(preset.values)を使わず、常にファイルを読み直す(他で書き換わっていても
+// 最新の内容を反映するため)。「ファイルから読み込む」で読み込んだだけのプリセットや、
+// ダウンロード保存のみでフォルダ未経由のプリセットはファイルへのアクセス権が無いため、
+// キャッシュしてある値をそのまま使う。
+const presetResetButton = document.getElementById("presetResetButton");
+if (presetResetButton) {
+  presetResetButton.addEventListener("click", async () => {
+    const select = document.getElementById("presetSelect");
+    const name = select ? select.value : "";
+    if (!name) {
+      setPresetMessage("戻すプリセットを選んでください");
+      return;
+    }
+    const preset = presetSessionList.find(p => p.name === name);
+    if (!preset) {
+      setPresetMessage("そのプリセットは見つかりませんでした");
+      return;
+    }
+
+    let values;
+    if (preset.fileHandle) {
+      try {
+        const file = await preset.fileHandle.getFile();
+        const text = await file.text();
+        const data = JSON.parse(text);
+        values = data.values || data;
+        preset.values = values; // キャッシュも最新の内容に更新しておく
+      } catch (e) {
+        setPresetMessage("プリセットファイルの読み込みに失敗しました");
+        return;
+      }
+    } else {
+      values = preset.values;
+    }
+    if (!values) {
+      setPresetMessage("プリセットの内容を読み込めませんでした");
+      return;
+    }
+
+    applyValues(values);
+    const nameInput = document.getElementById("presetName");
+    if (nameInput) nameInput.value = name;
+    setPresetMessage(`「${name}」をファイルの内容に戻しました`);
+  });
+}
+
+// ---- 「フォルダを選ぶ」(旧「呼び出す」ボタンを転用)：保存先/読み込み元フォルダを
+// いつでも選び直せるようにする ----
+// プリセットの読み込み自体は上のとおり<select>を選んだ瞬間に行われるようになったため、
+// このボタンの役目は「間違ったフォルダを選んでしまった時にいつでも選び直せる」フォルダ
+// 選択専用に変える(以前はフォルダ未選択の時だけこの動きをしていたが、常に開けるようにする。
+// pickPresetDirectory()は「保存フォルダを選ぶ」ボタンと共通の処理で、成功すると
+// フォルダ内のプリセット一覧も自動でスキャンされる)。
+const presetApplyButton = document.getElementById("presetApplyButton");
+if (presetApplyButton) {
+  if (!supportsFSAccess) {
+    presetApplyButton.disabled = true;
+    presetApplyButton.title = "お使いのブラウザは対応していません（Chrome/Edge推奨）";
+  } else {
+    presetApplyButton.addEventListener("click", async () => {
+      let ok = false;
+      try {
+        ok = await pickPresetDirectory();
+      } catch (e) {
+        setPresetMessage("フォルダの選択中にエラーが発生しました");
+        return;
+      }
+      if (!ok) return;
+      // フォルダを選んだ直後、一覧の一番上のプリセットを自動的に読み込む
+      const applied = await autoApplyTopPreset();
+      if (!applied) setPresetMessage(`「${presetDirHandle.name}」フォルダを読み込みました`);
+    });
+  }
+}
+
+// ---- 「削除する」：一覧から外し、保存フォルダ由来のプリセットなら実ファイルも削除する ----
+// 実ファイルの削除はゴミ箱を経由しない完全削除（元に戻せない）。フォルダ経由で保存/
+// 読み込んだプリセット(fileHandleを持つもの)のみファイルも消す。「ファイルから読み込む」
+// で読み込んだだけのプリセットはファイルの場所へのアクセス権が無いため、一覧から外すだけ。
+const presetDeleteButton = document.getElementById("presetDeleteButton");
+if (presetDeleteButton) {
+  presetDeleteButton.addEventListener("click", async () => {
+    const select = document.getElementById("presetSelect");
+    const name = select ? select.value : "";
+    if (!name) {
+      setPresetMessage("削除するプリセットを選んでください");
+      return;
+    }
+    const preset = presetSessionList.find(p => p.name === name);
+
+    // 保存フォルダ経由のプリセットは実ファイルごと完全削除される(元に戻せない)ため、
+    // うっかり押してしまった時のために確認を挟む。一覧から外すだけ(ファイルは無事)の
+    // 場合は影響が軽いので、それに合わせて文言を変える。
+    const willDeleteFile = !!(preset && preset.fileHandle && presetDirHandle);
+    const confirmMessage = willDeleteFile
+      ? `「${name}」を削除します。保存先フォルダの実ファイルも完全に削除され、元に戻せません。よろしいですか？`
+      : `「${name}」を一覧から外します。よろしいですか？`;
+    if (!window.confirm(confirmMessage)) {
+      setPresetMessage("削除をキャンセルしました");
+      return;
+    }
+
+    let fileDeleted = false;
+    let fileDeleteFailed = false;
+    if (preset && preset.fileHandle && presetDirHandle) {
+      const targetFileName = preset.fileName || (sanitizeFileName(name) + ".json");
+      try {
+        await presetDirHandle.removeEntry(targetFileName);
+        fileDeleted = true;
+      } catch (e) {
+        fileDeleteFailed = true;
+      }
+    }
+
+    presetSessionList = presetSessionList.filter(p => p.name !== name);
+    refreshPresetSelect();
+
+    if (fileDeleteFailed) {
+      setPresetMessage(`「${name}」のファイル削除に失敗しました（一覧からは外しました）`);
+    } else if (fileDeleted) {
+      setPresetMessage(`「${name}」をファイルごと削除しました`);
+    } else {
+      setPresetMessage(`「${name}」を一覧から外しました（保存済みファイルは削除されていません）`);
+    }
+  });
+}
+
+// ============================================================
+// 元に戻す：直前に変更した1つのパラメータだけを、変更前の値に戻す
+// （プリセットのような複数パラメータのやり直し履歴ではなく、あくまで
+// 「一つ前」だけを覚えておく単純な機能）。対象はPRESET_FIELD_IDS /
+// PRESET_CHECKBOX_FIELD_IDSと同じ、保存・復元対象になっている全パラメータ。
+// ============================================================
+let lastChange = null; // { id, prevValue, isCheckbox } | null。何も変更していなければnull
+const beforeEditValue = {}; // 各欄がフォーカスされた時点の値（=「編集前」の値）を覚えておく
+
+const undoButton = document.getElementById("undoButton");
+const undoMessage = document.getElementById("undoMessage");
+
+function updateUndoButtonState() {
+  if (undoButton) undoButton.disabled = !lastChange;
+}
+
+// フォーカスが当たった瞬間の値を「編集前の値」として記録する。inputイベントは
+// 値が変わった後にしか発火しないため、変更前の値を知るにはこの一手間が必要。
+function recordFocusValue(id, isCheckbox) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  beforeEditValue[id] = isCheckbox ? el.checked : el.value;
+}
+
+function recordChange(id, isCheckbox) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const prevValue = id in beforeEditValue ? beforeEditValue[id] : (isCheckbox ? el.checked : el.value);
+  lastChange = { id, prevValue, isCheckbox };
+  // 同じ欄を続けて変更した場合に「1段階ずつ」戻せるよう、今の値を次回の
+  // 「編集前の値」として更新しておく（セッション開始時の値まで一気に戻すのではない）。
+  beforeEditValue[id] = isCheckbox ? el.checked : el.value;
+  updateUndoButtonState();
+  if (undoMessage) undoMessage.textContent = "";
+}
+
+PRESET_FIELD_IDS.forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  beforeEditValue[id] = el.value;
+  el.addEventListener("focus", () => recordFocusValue(id, false));
+  el.addEventListener("input", () => recordChange(id, false));
+});
+PRESET_CHECKBOX_FIELD_IDS.forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  beforeEditValue[id] = el.checked;
+  el.addEventListener("focus", () => recordFocusValue(id, true));
+  el.addEventListener("change", () => recordChange(id, true));
+});
+
+if (undoButton) {
+  undoButton.addEventListener("click", () => {
+    if (!lastChange) return;
+    const { id, prevValue, isCheckbox } = lastChange;
+    const el = document.getElementById(id);
+    if (!el) { lastChange = null; updateUndoButtonState(); return; }
+
+    if (isCheckbox) {
+      el.checked = prevValue;
+      el.dispatchEvent(new Event("change", { bubbles: true })); // bindCheckboxに反映させる
+    } else {
+      el.value = prevValue;
+      el.dispatchEvent(new Event("input", { bubbles: true })); // bindInputに反映させる
+    }
+    // 上のdispatchEvent()はrecordChange()を再度呼び出し、lastChangeを
+    // 「今の元に戻す操作そのもの」で上書きしてしまう。そのままだと誤って
+    // 連続で「元に戻す」を押すたびに前後を行き来できてしまうため、ここで
+    // 明示的にnullへ戻し、「一つ前だけに戻す」という単純な仕様を保つ。
+    beforeEditValue[id] = isCheckbox ? el.checked : el.value;
+    lastChange = null;
+    updateUndoButtonState();
+    if (undoMessage) undoMessage.textContent = "1つ前の値に戻しました";
+  });
+}
+
+updateUndoButtonState();
+</script>
+
+</body>
+</html>

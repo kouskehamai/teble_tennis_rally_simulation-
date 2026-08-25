@@ -1,0 +1,47 @@
+{
+  "name": "table-tennis-rally-simulator",
+  "version": "1.0.0",
+  "description": "卓球ラリーシミュレーター（オフライン動作の物理シミュレーター）",
+  "main": "main.js",
+  "author": "kousukehamai",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build": "electron-builder --win --mac"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.kousukehamai.tabletennisrallysimulator",
+    "productName": "卓球ラリーシミュレーター",
+    "files": [
+      "main.js",
+      "index.html"
+    ],
+    "extraResources": [
+      {
+        "from": "presets",
+        "to": "presets"
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.sports",
+      "icon": "build/icon.icns"
+    }
+  }
+}
