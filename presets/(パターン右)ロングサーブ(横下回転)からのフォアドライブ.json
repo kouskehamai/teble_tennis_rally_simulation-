@@ -35,14 +35,14 @@
       "3": {
         "posX": 0,
         "depth": -24,
-        "height": 5,
-        "delayMs": 70,
-        "angle": -6,
-        "tiltX": 85,
-        "rollAngle": -20,
-        "swingDir": 75,
-        "swingY": 10,
-        "swingSpeed": 0.8,
+        "height": 0,
+        "delayMs": 150,
+        "angle": -4,
+        "tiltX": 95,
+        "rollAngle": -15,
+        "swingDir": 5,
+        "swingY": 5,
+        "swingSpeed": 2,
         "backhand": false
       },
       "4": {

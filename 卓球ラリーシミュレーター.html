@@ -4762,14 +4762,7 @@ async function pickPresetDirectory() {
   try {
     handle = await window.showDirectoryPicker();
   } catch (e) {
-    // ユーザーがダイアログをキャンセルした場合は仕様上AbortErrorになる。それ以外の
-    // エラー(環境側の問題など)は無言で握りつぶさず、原因が分かるようメッセージに出す
-    // (以前は全エラーを無反応でキャンセル扱いにしていたため、原因不明のまま
-    // 「ボタンを押しても反応がない」ように見えてしまっていた)。
-    if (e && e.name !== "AbortError") {
-      setPresetMessage(`フォルダの選択に失敗しました（${e.name}: ${e.message}）`);
-    }
-    return false;
+    return false; // キャンセルされた場合
   }
   try {
     const perm = await handle.requestPermission({ mode: "readwrite" });
